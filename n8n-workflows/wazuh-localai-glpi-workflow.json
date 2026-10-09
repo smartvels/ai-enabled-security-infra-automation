@@ -1,0 +1,239 @@
+{
+  "name": "Wazuh - LocalAI Triage - GLPI Ticket",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wazuh-alert",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1a111111-1111-4111-8111-111111111101",
+      "name": "Wazuh Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1180, 300],
+      "webhookId": "wazuh-alert"
+    },
+    {
+      "parameters": {
+        "jsBinaryPropertyName": "data",
+        "jsCode": "// Build the LocalAI request body as a real JS object.\n// This is the fix your team already found in the original workflow:\n// n8n's {{ }} expression syntax does not support JSON.stringify()\n// the way plain JavaScript does, so the request body must be built\n// here in a Code node, not templated as a string.\n\nconst alert = items[0].json;\n\nconst systemPrompt = \"You are a SOC analyst. Classify this Wazuh alert as \" +\n  \"true_positive or false_positive. Respond ONLY with valid JSON in this \" +\n  \"exact format: {'verdict': 'true_positive or false_positive', \" +\n  \"'confidence': a number 0 to 100, 'reason': 'short explanation', \" +\n  \"'source_ip': 'extracted IP if present'}\";\n\nconst alertText = JSON.stringify(alert);\n\nconst payload = {\n  model: \"Qwen2.5-7B-Instruct-Q4_K_M.gguf\",\n  messages: [\n    { role: \"system\", content: systemPrompt },\n    { role: \"user\", content: alertText }\n  ]\n};\n\nreturn [{ json: { payload, original_alert: alert } }];"
+      },
+      "id": "1a111111-1111-4111-8111-111111111102",
+      "name": "Build LocalAI Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-960, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://${LOCALAI_HOST}:8080/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {}
+      },
+      "id": "1a111111-1111-4111-8111-111111111103",
+      "name": "Call LocalAI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-740, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse LocalAI's response into a clean verdict object.\n// Handles the model sometimes prefixing the JSON with stray text,\n// and single-quoted JSON-like output (both seen in production).\n\nconst response = items[0].json;\nconst rawContent = response.choices[0].message.content;\n\nconst jsonStart = rawContent.indexOf('{');\nif (jsonStart === -1) {\n  throw new Error('No JSON object found in LocalAI output: ' + rawContent);\n}\n\nconst verdictText = rawContent.slice(jsonStart).replace(/'/g, '\"');\nconst verdict = JSON.parse(verdictText);\n\n// Carry the original alert through for the GLPI ticket step.\nconst originalAlert = $('Build LocalAI Request').item.json.original_alert;\n\nreturn [{\n  json: {\n    verdict: verdict.verdict,\n    confidence: verdict.confidence,\n    reason: verdict.reason,\n    source_ip: verdict.source_ip,\n    original_alert: originalAlert\n  }\n}];"
+      },
+      "id": "1a111111-1111-4111-8111-111111111104",
+      "name": "Parse Verdict",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-520, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "1a111111-1111-4111-8111-111111111105",
+              "leftValue": "={{ $json.verdict }}",
+              "rightValue": "true_positive",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1a111111-1111-4111-8111-111111111106",
+      "name": "Is True Positive?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-300, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.GLPI_URL }}/initSession",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "App-Token", "value": "={{ $env.GLPI_APP_TOKEN }}" },
+            { "name": "Authorization", "value": "=user_token {{ $env.GLPI_USER_TOKEN }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1a111111-1111-4111-8111-111111111107",
+      "name": "GLPI Init Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-80, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the GLPI ticket payload.\n// Critical fix from the original build: GLPI expects `input` to be a\n// JSON OBJECT, not an array -- sending an array causes ERROR_BAD_ARRAY.\n\nconst verdictData = $('Is True Positive?').item.json;\nconst sessionToken = items[0].json.session_token;\n\nconst alert = verdictData.original_alert || {};\nconst ruleId = (alert.rule && alert.rule.id) || 'unknown';\nconst ruleDesc = (alert.rule && alert.rule.description) || 'Wazuh alert';\n\nconst ticketBody =\n  'Automated ticket created from Wazuh alert.\\n\\n' +\n  'Rule ID: ' + ruleId + '\\n' +\n  'Description: ' + ruleDesc + '\\n' +\n  'Source IP: ' + verdictData.source_ip + '\\n' +\n  'LocalAI verdict: ' + verdictData.verdict + ' (' + verdictData.confidence + '% confidence)\\n' +\n  'Reason: ' + verdictData.reason;\n\nconst payload = {\n  input: {\n    name: 'Security Alert - Rule ' + ruleId + ' - ' + verdictData.source_ip,\n    content: ticketBody,\n    urgency: verdictData.confidence >= 80 ? 5 : 3,\n    type: 1\n  }\n};\n\nreturn [{ json: { payload, session_token: sessionToken } }];"
+      },
+      "id": "1a111111-1111-4111-8111-111111111108",
+      "name": "Build GLPI Ticket",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [140, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GLPI_URL }}/Ticket",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "App-Token", "value": "={{ $env.GLPI_APP_TOKEN }}" },
+            { "name": "Session-Token", "value": "={{ $json.session_token }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {}
+      },
+      "id": "1a111111-1111-4111-8111-111111111109",
+      "name": "Create GLPI Ticket",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [360, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.GLPI_URL }}/killSession",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "App-Token", "value": "={{ $env.GLPI_APP_TOKEN }}" },
+            { "name": "Session-Token", "value": "={{ $('Build GLPI Ticket').item.json.session_token }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1a111111-1111-4111-8111-111111111112",
+      "name": "GLPI Kill Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [580, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: \"ticket_created\", verdict: $('Is True Positive?').item.json.verdict, glpi_response: $('Create GLPI Ticket').item.json } }}",
+        "options": {}
+      },
+      "id": "1a111111-1111-4111-8111-111111111110",
+      "name": "Respond - Ticket Created",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [800, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: \"logged_no_action\", verdict: $json.verdict, reason: $json.reason } }}",
+        "options": {}
+      },
+      "id": "1a111111-1111-4111-8111-111111111111",
+      "name": "Respond - No Action",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [-80, 420]
+    }
+  ],
+  "connections": {
+    "Wazuh Webhook": {
+      "main": [
+        [ { "node": "Build LocalAI Request", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Build LocalAI Request": {
+      "main": [
+        [ { "node": "Call LocalAI", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Call LocalAI": {
+      "main": [
+        [ { "node": "Parse Verdict", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Parse Verdict": {
+      "main": [
+        [ { "node": "Is True Positive?", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Is True Positive?": {
+      "main": [
+        [ { "node": "GLPI Init Session", "type": "main", "index": 0 } ],
+        [ { "node": "Respond - No Action", "type": "main", "index": 0 } ]
+      ]
+    },
+    "GLPI Init Session": {
+      "main": [
+        [ { "node": "Build GLPI Ticket", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Build GLPI Ticket": {
+      "main": [
+        [ { "node": "Create GLPI Ticket", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Create GLPI Ticket": {
+      "main": [
+        [ { "node": "GLPI Kill Session", "type": "main", "index": 0 } ]
+      ]
+    },
+    "GLPI Kill Session": {
+      "main": [
+        [ { "node": "Respond - Ticket Created", "type": "main", "index": 0 } ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

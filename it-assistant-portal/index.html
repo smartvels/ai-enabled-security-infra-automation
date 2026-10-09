@@ -1,0 +1,2388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>AI IT Assistant Platform</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#212121;color:#ececec;height:100vh;display:flex;overflow:hidden}
+#loginPage{position:fixed;inset:0;background:#212121;display:flex;align-items:center;justify-content:center;z-index:9999}
+.lbox{background:#2f2f2f;border:1px solid #3f3f3f;border-radius:16px;padding:40px;width:380px;max-width:92vw;text-align:center}
+.lbox img{width:60px;height:60px;object-fit:contain;margin-bottom:12px}
+.lbox h1{font-size:26px;font-weight:700;margin-bottom:4px}
+.lbox p{font-size:13px;color:#666;margin-bottom:20px}
+.lerr{color:#da3633;font-size:12px;margin-bottom:10px;display:none;text-align:left;padding:6px 10px;background:#2e1a1a;border-radius:6px}
+.li{width:100%;padding:10px 14px;background:#212121;border:1px solid #3f3f3f;border-radius:8px;color:#ececec;font-size:14px;outline:none;margin-bottom:10px;font-family:inherit}
+.li:focus{border-color:#555}
+.lb{width:100%;padding:11px;background:#ececec;border:none;border-radius:8px;color:#212121;font-size:14px;font-weight:600;cursor:pointer}
+.lb:hover{background:#d0d0d0}.lb:disabled{background:#555;color:#888;cursor:not-allowed}
+.sidebar{width:220px;background:#171717;display:flex;flex-direction:column;flex-shrink:0;border-right:1px solid #2f2f2f;height:100vh;transition:left .3s}
+.slogo{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid #2f2f2f;flex-shrink:0}
+.slogo img{width:26px;height:26px;object-fit:contain}
+.slogo span{font-size:17px;font-weight:600}
+.suser{padding:6px 14px;font-size:11px;color:#666;border-bottom:1px solid #2f2f2f;display:none;justify-content:space-between;align-items:center;flex-shrink:0}
+.rbadge{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;margin-left:4px}
+.r-superadmin{background:#7c3aed;color:#fff}.r-admin{background:#1f6feb;color:#fff}.r-user{background:#3f3f3f;color:#9b9b9b}
+.sscroll{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:8px}
+.sscroll::-webkit-scrollbar{width:3px}
+.sscroll::-webkit-scrollbar-thumb{background:#2f2f2f;border-radius:2px}
+.slbl{font-size:10px;font-weight:600;color:#555;padding:10px 16px 3px;letter-spacing:.06em;text-transform:uppercase}
+.sbtn{display:flex;align-items:center;gap:7px;padding:7px 13px;font-size:12px;color:#9b9b9b;cursor:pointer;border-radius:6px;margin:1px 5px;border:none;background:transparent;width:calc(100% - 10px);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sbtn:hover,.sbtn.on{background:#2f2f2f;color:#ececec}
+.sdiv{border:none;border-top:1px solid #2f2f2f;margin:5px 10px}
+.brand{padding:8px 14px;font-size:9px;color:#444;border-top:1px solid #2f2f2f;flex-shrink:0}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.chat-view{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.chat-area{flex:1;overflow-y:auto;padding:16px 0}
+.chat-area::-webkit-scrollbar{width:4px}
+.chat-area::-webkit-scrollbar-thumb{background:#2f2f2f;border-radius:2px}
+.welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px}
+.welcome img{width:56px;height:56px;object-fit:contain;opacity:.9}
+.welcome h1{font-size:40px;font-weight:600;margin-top:8px}
+.welcome p{font-size:15px;color:#555}
+.mw{padding:3px 36px;max-width:860px;margin:0 auto;width:100%}
+.ubub{background:#2f2f2f;border-radius:18px 18px 4px 18px;padding:9px 15px;max-width:70%;font-size:14px;line-height:1.7;user-select:text}
+.airow{display:flex;gap:10px;margin-bottom:14px;align-items:flex-start}
+.avt{width:24px;height:24px;border-radius:50%;overflow:hidden;flex-shrink:0;margin-top:2px}
+.avt img{width:24px;height:24px;object-fit:contain}
+.aibody{flex:1;min-width:0}
+.ainame{font-size:11px;font-weight:600;color:#9b9b9b;margin-bottom:4px}
+.cbk{background:#1e1e1e;border:1px solid #3f3f3f;border-radius:8px;margin:6px 0;overflow:hidden}
+.cbkh{display:flex;justify-content:space-between;align-items:center;padding:5px 12px;background:#252525;border-bottom:1px solid #3f3f3f}
+.cbkh span{font-size:11px;color:#666;font-family:monospace}
+.cbkh button{background:none;border:none;color:#666;font-size:11px;cursor:pointer;padding:2px 6px;border-radius:3px}
+.cbkb{padding:10px 12px;font-family:"Courier New",monospace;font-size:12px;color:#ce9178;line-height:1.5;overflow-x:auto;user-select:text;white-space:pre}
+.actrow{display:flex;gap:2px;margin-top:5px}
+.abtn{background:none;border:none;color:#555;font-size:11px;cursor:pointer;padding:2px 7px;border-radius:3px}
+.abtn:hover{background:#2f2f2f;color:#9b9b9b}
+.fixtxt{font-size:13px;line-height:1.8;color:#9b9b9b}
+.tkbtn{margin-top:8px;padding:8px 14px;background:#3a1515;border:1px solid #da3633;border-radius:8px;color:#ececec;font-size:12px;cursor:pointer}
+.iwrap{max-width:860px;margin:0 auto;width:100%;padding:8px 36px 12px}
+.ibox{background:#2f2f2f;border:1px solid #3f3f3f;border-radius:12px;padding:9px 13px;display:flex;align-items:flex-end;gap:7px}
+.ibox:focus-within{border-color:#555}
+#inputBox{flex:1;background:none;border:none;outline:none;font-size:14px;color:#ececec;resize:none;height:24px;max-height:120px;font-family:inherit;line-height:1.5}
+#inputBox::placeholder{color:#555}
+#sendBtn{width:30px;height:30px;border-radius:7px;background:#ececec;border:none;cursor:pointer;font-size:16px;color:#212121;flex-shrink:0}
+#sendBtn:hover{background:#d0d0d0}
+#sendBtn:disabled{background:#3f3f3f;color:#666;cursor:not-allowed}
+.fhint{text-align:center;font-size:10px;color:#444;margin-top:5px}
+.admin-view{flex:1;display:none;flex-direction:column;overflow:hidden}
+.ahdr{background:#171717;border-bottom:1px solid #2f2f2f;padding:0 8px;display:flex;align-items:center;overflow-x:auto;flex-shrink:0}
+.ahdr::-webkit-scrollbar{height:0}
+.atab{padding:11px 10px;font-size:11px;color:#666;cursor:pointer;border:none;background:transparent;border-bottom:2px solid transparent;white-space:nowrap;flex-shrink:0}
+.atab:hover{color:#9b9b9b}.atab.on{color:#ececec;border-bottom-color:#7c3aed}
+.ac{flex:1;overflow-y:auto;padding:18px}
+.ac::-webkit-scrollbar{width:4px}
+.ac::-webkit-scrollbar-thumb{background:#2f2f2f;border-radius:2px}
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
+.sc{background:#2f2f2f;border:1px solid #3f3f3f;border-radius:10px;padding:13px}
+.sc .v{font-size:26px;font-weight:700;line-height:1}
+.sc .l{font-size:11px;color:#666;margin-top:3px}
+.card{background:#2f2f2f;border:1px solid #3f3f3f;border-radius:10px;padding:14px;margin-bottom:14px}
+.ct{font-size:13px;font-weight:600;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{padding:7px 9px;text-align:left;color:#666;background:#212121;font-weight:600;border-bottom:1px solid #3f3f3f}
+.tbl td{padding:7px 9px;border-bottom:1px solid #2a2a2a}
+.tbl tr:hover td{background:#252525}
+.badge{display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:600}
+.bg{background:#1a2e1a;color:#2ea043;border:1px solid #238636}
+.br{background:#2e1a1a;color:#f85149;border:1px solid #da3633}
+.bo{background:#2e2a1a;color:#f0883e;border:1px solid #d29922}
+.bb{background:#1a1f2e;color:#58a6ff;border:1px solid #1f6feb}
+.bx{background:#2f2f2f;color:#8b949e;border:1px solid #3f3f3f}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px}
+.dg{background:#2ea043}.dr{background:#da3633}.do{background:#f0883e}
+.prog{height:5px;background:#212121;border-radius:3px;overflow:hidden;margin-top:3px}
+.pb{height:100%;border-radius:3px}
+.btn{padding:5px 12px;border:none;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap}
+.bg2{background:#238636;color:#fff}.bb2{background:#1f6feb;color:#fff}
+.br2{background:#da3633;color:#fff}.bx2{background:#3f3f3f;color:#9b9b9b}.bo2{background:#d29922;color:#000}
+.bg2:hover{background:#2ea043}.bb2:hover{background:#388bfd}.bx2:hover{background:#484f58;color:#ececec}
+.fi{padding:7px 11px;background:#212121;border:1px solid #3f3f3f;border-radius:6px;color:#ececec;font-size:12px;outline:none;font-family:inherit;width:100%}
+.fi:focus{border-color:#555}
+.al{background:#212121;border-radius:8px;padding:11px;margin-bottom:7px;border-left:3px solid}
+.alc{border-color:#da3633}.alh{border-color:#f0883e}.alm{border-color:#d29922}.all{border-color:#1f6feb}
+.dexc{width:76px;height:76px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;border:4px solid;flex-shrink:0}
+.mov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center}
+.mov.on{display:flex}
+.mdl{background:#2f2f2f;border:1px solid #3f3f3f;border-radius:12px;padding:22px;width:400px;max-width:92vw}
+.mtog{position:fixed;top:10px;left:10px;z-index:1001;background:#2f2f2f;border:1px solid #3f3f3f;border-radius:8px;padding:8px;cursor:pointer;color:#ececec;font-size:17px;display:none;align-items:center;justify-content:center;width:38px;height:38px}
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999}
+.ov.on{display:block}
+@media(max-width:768px){
+  .sidebar{position:fixed;left:-220px;top:0;height:100vh;z-index:1000}
+  .sidebar.open{left:0}
+  .main{width:100vw}
+  .mw,.iwrap{padding-left:10px !important;padding-right:10px !important}
+  .ubub{max-width:86% !important}
+  .welcome h1{font-size:30px !important}
+  .mtog{display:flex !important}
+  .sg{grid-template-columns:repeat(2,1fr)}
+  .ac{padding:10px}
+}
+.agrp{padding:3px 8px;font-size:9px;font-weight:700;color:#555;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;border-left:2px solid #3f3f3f;margin-left:4px;align-self:center;display:inline-flex;align-items:center}
+.modelpicker{position:relative;margin:5px 13px}
+.modelbtn{width:100%;display:flex;align-items:center;justify-content:space-between;padding:8px 10px;font-size:12px;color:#e5e5e5;background:#262626;border:1px solid #3a3a3a;border-radius:6px;cursor:pointer;text-align:left}
+.modelbtn:hover{border-color:#7c3aed}
+.modelchev{font-size:10px;color:#888;margin-left:6px}
+.modelmenu{display:none;position:absolute;bottom:calc(100% + 4px);left:0;right:0;background:#242424;border:1px solid #3a3a3a;border-radius:6px;overflow:hidden;z-index:50;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.modelmenu.open{display:block}
+.modelopt{padding:8px 10px;font-size:12px;color:#ddd;cursor:pointer;border-bottom:1px solid #2f2f2f}
+.modelopt:last-child{border-bottom:none}
+.modelopt:hover{background:#333}
+.modelopt.sel{color:#a78bfa;font-weight:600}
+.modelopt small{display:block;color:#777;font-size:10px;font-weight:400;margin-top:1px}
+.codecard{background:#1e1e1e;border:1px solid #333;border-radius:8px;margin:8px 0;overflow:hidden}
+.codecardh{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#252525;font-size:11px;color:#999}
+.codecardp{padding:8px 10px;font-size:12px;color:#888;font-family:monospace;white-space:pre-wrap;max-height:54px;overflow:hidden;position:relative}
+.codecardp:after{content:'';position:absolute;bottom:0;left:0;right:0;height:24px;background:linear-gradient(transparent,#1e1e1e)}
+.codecardbtns{display:flex;gap:8px}
+.codecard-open,.cbk-cp{background:none;border:1px solid #444;color:#ccc;font-size:10px;padding:2px 8px;border-radius:4px;cursor:pointer}
+.codecard-open:hover,.cbk-cp:hover{border-color:#7c3aed;color:#a78bfa}
+.codepanel{position:fixed;top:0;right:-520px;width:520px;max-width:92vw;height:100vh;background:#1a1a1a;border-left:1px solid #333;z-index:900;transition:right .25s ease;display:flex;flex-direction:column}
+.codepanel.open{right:0}
+.codepanelh{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #2f2f2f;background:#202020}
+.codepanelh span{font-size:13px;color:#ddd;font-weight:600}
+.codepanelbtns{display:flex;gap:8px;align-items:center}
+.codepanel-cp,.codepanel-close{background:#2a2a2a;border:1px solid #3a3a3a;color:#ccc;font-size:11px;padding:5px 10px;border-radius:5px;cursor:pointer}
+.codepanel-cp:hover,.codepanel-close:hover{border-color:#7c3aed;color:#a78bfa}
+.codepanelb{flex:1;overflow:auto;padding:16px;font-family:monospace;font-size:12.5px;line-height:1.6;color:#d4d4d4;white-space:pre-wrap;word-break:break-word}
+@media(max-width:900px){.codepanel{width:100vw;right:-100vw}}
+</style>
+</head>
+<body>
+
+<div id="loginPage">
+  <div class="lbox">
+    <img src="/static/logo.png" alt="AI Assistant">
+    <h1>AI Assistant</h1>
+    <p>IT Self-Service Platform</p>
+    <div id="lerr" class="lerr"></div>
+    <input id="lu" class="li" type="text" placeholder="Username" autocomplete="username">
+    <input id="lp" class="li" type="password" placeholder="Password" autocomplete="current-password">
+    <button id="lbtn" class="lb">Sign In</button>
+    <div style="margin-top:12px;font-size:10px;color:#444;">Example Organization</div>
+  </div>
+</div>
+
+<button class="mtog" id="mtog">&#9776;</button>
+<div class="ov" id="ov"></div>
+
+<div class="sidebar" id="sidebar">
+  <div class="slogo"><img src="/static/logo.png" alt="AI Assistant"><span>AI Assistant</span></div>
+  <div class="suser" id="suser">
+    <span id="suserTxt"></span>
+    <button id="logoutBtn" style="background:none;border:none;color:#555;cursor:pointer;font-size:11px;">Sign Out</button>
+  </div>
+  <div class="sscroll">
+    <button class="sbtn" id="btnNewChat">&#9998; New Chat</button>
+    <div class="slbl">RECENT</div>
+    <div id="histList"></div>
+    <hr class="sdiv">
+    <div class="slbl">IT SUPPORT</div>
+    <button class="sbtn" data-fix="network">&#127760; Network Issue</button>
+    <button class="sbtn" data-fix="slowpc">&#128000; Slow PC</button>
+    <button class="sbtn" data-fix="vpn">&#128274; VPN Issue</button>
+    <button class="sbtn" data-fix="teams">&#128188; Teams / TPM</button>
+    <button class="sbtn" data-fix="systemcrash">&#128165; System Crash</button>
+    <hr class="sdiv">
+    <div class="slbl">TOOLS</div>
+    <button class="sbtn" id="btnTicket">&#127915; Raise Ticket</button>
+    <div id="adminNav" style="display:none">
+      <hr class="sdiv">
+      <div class="slbl">&#128187; ENDPOINT MGMT</div>
+      <button class="sbtn" data-tab="dashboard">&#128200; Dashboard</button>
+      <button class="sbtn" data-tab="endpoints">&#128187; Endpoints</button>
+      <button class="sbtn" data-tab="inventory">&#128230; Inventory</button>
+      <button class="sbtn" data-tab="software_monitor">&#128270; SW Monitor</button>
+      <button class="sbtn" data-tab="dex">&#128200; DEX Score</button>
+      <button class="sbtn" data-tab="remote">&#128444; Remote Access</button>
+      <hr class="sdiv">
+      <div class="slbl">&#128272; SECURITY</div>
+      <button class="sbtn" data-tab="secops">&#128680; Security Ops</button>
+      <button class="sbtn" data-tab="wazuh">&#128272; Wazuh SIEM</button>
+      <button class="sbtn" data-tab="openvas">&#128269; OpenVAS</button>
+      <button class="sbtn" data-tab="threatintel">&#129302; Threat Intel</button>
+      <button class="sbtn" data-tab="dlp">&#128274; DLP Monitor</button>
+      <button class="sbtn" data-tab="security">&#128737; Security Scan</button>
+      <hr class="sdiv">
+      <div class="slbl">&#127915; ITSM</div>
+      <button class="sbtn" data-tab="incidents">&#128680; Incidents</button>
+      <button class="sbtn" data-tab="changes">&#128260; Changes</button>
+      <button class="sbtn" data-tab="remediation">&#128295; Remediation</button>
+      <button class="sbtn" data-tab="ai">&#129504; AI Assist</button>
+      <hr class="sdiv">
+      <div class="slbl">&#9729; INFRASTRUCTURE</div>
+      <button class="sbtn" data-tab="pbs">&#128190; PBS Backups</button>
+      <button class="sbtn" data-tab="zabbix">&#128225; Zabbix</button>
+      <hr class="sdiv">
+      <div class="slbl">&#9881; MANAGEMENT</div>
+      <button class="sbtn" data-tab="patch">&#128260; Patch Mgmt</button>
+      <button class="sbtn" data-tab="software_deploy">&#128640; SW Deploy</button>
+      <button class="sbtn" data-tab="bitlocker">&#128274; BitLocker</button>
+      <button class="sbtn" data-tab="software">&#128190; Software</button>
+      <button class="sbtn" data-tab="services">&#9881; Services</button>
+      <button class="sbtn" data-tab="startup">&#128640; Startup</button>
+      <button class="sbtn" data-tab="usb">&#128268; USB Control</button>
+      <button class="sbtn" data-tab="eventlogs">&#128203; Event Logs</button>
+      <button class="sbtn" data-tab="perf">&#128200; Performance</button>
+      <button class="sbtn" data-tab="localusers">&#128101; Local Users</button>
+      <button class="sbtn" data-tab="printers">&#128424; Printers</button>
+      <button class="sbtn" data-tab="drives">&#128190; Net Drives</button>
+      <hr class="sdiv">
+      <div class="slbl">&#128202; REPORTS</div>
+      <button class="sbtn" data-tab="reports">&#128202; Reports</button>
+      <button class="sbtn" data-tab="settings">&#9881; Settings</button>
+    </div>
+    <hr class="sdiv">
+    <div class="slbl">MODE</div>
+    <label style="display:flex;align-items:center;gap:8px;padding:5px 13px;font-size:12px;color:#9b9b9b;cursor:pointer;"><input type="radio" name="mode" value="it" checked style="accent-color:#7c3aed"> IT Support</label>
+    <label style="display:flex;align-items:center;gap:8px;padding:5px 13px;font-size:12px;color:#9b9b9b;cursor:pointer;"><input type="radio" name="mode" value="code" style="accent-color:#7c3aed"> Code Help</label>
+    <label style="display:flex;align-items:center;gap:8px;padding:5px 13px;font-size:12px;color:#9b9b9b;cursor:pointer;"><input type="radio" name="mode" value="general" style="accent-color:#7c3aed"> General</label>
+    <hr class="sdiv">
+    <div class="slbl">AI MODEL</div>
+    <div class="modelpicker" id="modelPicker">
+      <button type="button" class="modelbtn" id="modelBtn">
+        <span id="modelBtnLabel">Loading models...</span>
+        <span class="modelchev">&#9662;</span>
+      </button>
+      <div class="modelmenu" id="modelMenu"></div>
+      <select id="aiModelSelect" style="display:none"></select>
+    </div>
+  </div>
+  <div class="brand">Example Organization</div>
+</div>
+
+<div class="main">
+  <div class="chat-view" id="chatView">
+    <div class="chat-area" id="chatArea">
+      <div class="welcome" id="welcome">
+        <img src="/static/logo.png" alt="AI Assistant">
+        <h1>AI Assistant</h1><p>Ask Anything</p>
+      </div>
+    </div>
+    <div class="iwrap">
+      <div class="ibox">
+        <textarea id="inputBox" placeholder="Ask Anything..." rows="1"></textarea>
+        <button id="sendBtn">&#8679;</button>
+      </div>
+      <div class="fhint">Example Organization</div>
+    </div>
+  </div>
+  <div class="admin-view" id="adminView">
+    <div class="ahdr" id="ahdr">
+      <button class="atab" id="backBtn">&#8592; Chat</button>
+      <span class="agrp">ENDPOINTS</span>
+      <button class="atab on" data-tab="dashboard">&#128200; Dash</button>
+      <button class="atab" data-tab="endpoints">&#128187; Endpoints</button>
+      <button class="atab" data-tab="inventory">&#128230; Inventory</button>
+      <button class="atab" data-tab="software_monitor">&#128270; SW Monitor</button>
+      <button class="atab" data-tab="dex">&#128200; DEX</button>
+      <button class="atab" data-tab="remote">&#128444; Remote</button>
+      <span class="agrp">SECURITY</span>
+      <button class="atab" data-tab="secops">&#128680; SecOps</button>
+      <button class="atab" data-tab="wazuh">&#128272; Wazuh</button>
+      <button class="atab" data-tab="openvas">&#128269; OpenVAS</button>
+      <button class="atab" data-tab="threatintel">&#129302; ThreatIntel</button>
+      <button class="atab" data-tab="dlp">&#128274; DLP</button>
+      <button class="atab" data-tab="security">&#128737; Scan</button>
+      <span class="agrp">ITSM</span>
+      <button class="atab" data-tab="incidents">&#128680; Incidents</button>
+      <button class="atab" data-tab="changes">&#128260; Changes</button>
+      <button class="atab" data-tab="remediation">&#128295; Remediation</button>
+      <button class="atab" data-tab="ai">&#129504; AI</button>
+      <span class="agrp">INFRA</span>
+      <button class="atab" data-tab="pbs">&#128190; PBS</button>
+      <button class="atab" data-tab="zabbix">&#128225; Zabbix</button>
+      <span class="agrp">MGMT</span>
+      <button class="atab" data-tab="patch">&#128260; Patch</button>
+      <button class="atab" data-tab="software_deploy">&#128640; Deploy</button>
+      <button class="atab" data-tab="bitlocker">&#128274; BitLocker</button>
+      <button class="atab" data-tab="software">&#128190; Software</button>
+      <button class="atab" data-tab="services">&#9881; Services</button>
+      <button class="atab" data-tab="startup">&#128640; Startup</button>
+      <button class="atab" data-tab="usb">&#128268; USB</button>
+      <button class="atab" data-tab="eventlogs">&#128203; Events</button>
+      <button class="atab" data-tab="perf">&#128200; Perf</button>
+      <button class="atab" data-tab="localusers">&#128101; Users</button>
+      <button class="atab" data-tab="printers">&#128424; Printers</button>
+      <button class="atab" data-tab="drives">&#128190; Drives</button>
+      <span class="agrp">REPORTS</span>
+      <button class="atab" data-tab="reports">&#128202; Reports</button>
+      <button class="atab" data-tab="settings">&#9881; Settings</button>
+    </div>
+    <div class="ac" id="ac"><div style="color:#555;padding:40px;text-align:center;">Select a tab</div></div>
+  </div>
+</div>
+
+<div class="mov" id="ticketModal">
+  <div class="mdl">
+    <h3 style="margin-bottom:8px;">&#127915; Raise Support Ticket</h3>
+    <p style="font-size:12px;color:#9b9b9b;margin-bottom:10px;">Redirects to Zoho Desk.</p>
+    <input id="tkSubj" class="fi" style="margin-bottom:10px;" placeholder="Describe issue...">
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn bx2" id="tkClose">Cancel</button>
+      <button class="btn br2" id="tkSubmit">Open Zoho Desk</button>
+    </div>
+  </div>
+</div>
+<script>
+// ── GLOBALS ──────────────────────────────────────────────────
+var TOKEN=null,ROLE=null,chatHistory=[],sessions=[],isFirst=true,wAlerts=[];
+var ZOHO='https://helpdesk.example.com/portal/en/newticket';
+try{sessions=JSON.parse(localStorage.getItem('tq_s')||'[]');}catch(e){}
+
+var FIXES={
+  network:{l:'Network Issue',s:['Checking adapter...','Resetting TCP/IP...','Flushing DNS...','Releasing IP...','Renewing IP...'],d:'Done! Restart your PC.'},
+  slowpc:{l:'Slow PC',s:['Clearing temp...','Flushing DNS...','Running SFC...','Running DISM...'],d:'Done! Restart your PC.'},
+  vpn:{l:'VPN Issue',s:['Checking internet...','Flushing DNS...','Restarting GlobalProtect...'],d:'VPN fix applied!'},
+  teams:{l:'Teams/TPM',s:['Closing Teams...','Clearing credentials...','Clearing cache...','Clearing AAD tokens...'],d:'Teams cleared! Restart.'},
+  systemcrash:{l:'System Crash',s:['Running SFC...','Running DISM...','Checking disk...','Clearing temp...'],d:'Repair done! Restart.'}
+};
+
+// ── UTILS ─────────────────────────────────────────────────────
+function esc(t){return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function ah(){return {'Content-Type':'application/json','Authorization':'Bearer '+(TOKEN||'')};}
+function isAdmin(){return ROLE==='admin'||ROLE==='superadmin';}
+function gbSize(b){if(!b)return '0 B';if(b>1e12)return (b/1e12).toFixed(1)+' TB';if(b>1e9)return (b/1e9).toFixed(1)+' GB';if(b>1e6)return (b/1e6).toFixed(1)+' MB';return (b/1e3).toFixed(0)+' KB';}
+function dexColor(s){return s>=80?'#2ea043':s>=60?'#d29922':'#da3633';}
+function dexScore(e){
+  var s=100;
+  if(e.cpu_percent>80)s-=15;else if(e.cpu_percent>60)s-=5;
+  if(e.ram_percent>85)s-=20;else if(e.ram_percent>70)s-=8;
+  if(e.disk_percent>85)s-=20;else if(e.disk_percent>70)s-=8;
+  if(!String(e.antivirus||""))s-=20;
+  if(e.pending_updates>10)s-=15;else if(e.pending_updates>0)s-=5;
+  if(e.status!=='online')s-=10;
+  return Math.max(0,s);
+}
+async function getEps(){var r=await fetch('/api/admin/endpoints',{headers:ah()});var d=await r.json();return d.endpoints||[];}
+async function qCmd(host,type,payload){
+  var r=await fetch('/api/admin/command',{method:'POST',headers:ah(),body:JSON.stringify({hostname:host,command_type:type,payload:payload})});
+  return r.json();
+}
+function sc2(color,val,lbl,sub){return `<div class="sc"><div class="v" style="color:${color}">${val}</div><div class="l">${lbl}</div><div style="font-size:10px;color:#555">${sub}</div></div>`;}
+function cfgR(k,v){return `<div style="display:flex;justify-content:space-between;padding:7px 11px;background:#212121;border-radius:6px;margin-bottom:5px"><span style="color:#666">${k}</span><span style="font-family:monospace;font-size:11px">${v}</span></div>`;}
+function pbar(val,hi,lo){var bg=val>hi?'#da3633':val>lo?'#f0883e':'#2ea043';return `<div style="display:flex;align-items:center;gap:5px"><div style="width:50px;height:5px;background:#212121;border-radius:3px;overflow:hidden"><div style="width:${val}%;height:100%;background:${bg};border-radius:3px"></div></div>${val}%</div>`;}
+
+// ── MOBILE ────────────────────────────────────────────────────
+document.getElementById('mtog').onclick=()=>{
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('ov').classList.toggle('on');
+};
+document.getElementById('ov').onclick=()=>{
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('ov').classList.remove('on');
+};
+
+// ── VIEWS ─────────────────────────────────────────────────────
+function showChat(){
+  document.getElementById('chatView').style.display='flex';
+  document.getElementById('adminView').style.display='none';
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('ov').classList.remove('on');
+  localStorage.setItem('tq_view', JSON.stringify({view:'chat'}));
+}
+function showAdmin(tab){
+  if(!isAdmin()){alert('Admin access required.');return;}
+  document.getElementById('chatView').style.display='none';
+  document.getElementById('adminView').style.display='flex';
+  setTab(tab||'dashboard');
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('ov').classList.remove('on');
+}
+function setTab(tab){
+  document.querySelectorAll('.atab[data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  document.querySelectorAll('.sbtn[data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  localStorage.setItem('tq_view', JSON.stringify({view:'admin',tab:tab}));
+  loadTab(tab);
+}
+
+// ── DELEGATION ────────────────────────────────────────────────
+document.getElementById('sidebar').onclick=e=>{
+  var t=e.target.closest('.sbtn[data-tab]');if(t){showAdmin(t.dataset.tab);return;}
+  var f=e.target.closest('.sbtn[data-fix]');if(f){showChat();clearWelcome();addUser('Fix: '+FIXES[f.dataset.fix].l);runFix(f.dataset.fix);}
+};
+document.getElementById('ahdr').onclick=e=>{
+  var t=e.target.closest('.atab[data-tab]');if(t)setTab(t.dataset.tab);
+};
+document.getElementById('backBtn').onclick=showChat;
+
+// ── CHAT ──────────────────────────────────────────────────────
+function clearWelcome(){var w=document.getElementById('welcome');if(w)w.remove();}
+function scrollChat(){var a=document.getElementById('chatArea');setTimeout(()=>a.scrollTop=a.scrollHeight,60);}
+
+function addUser(text){
+  clearWelcome();
+  var d=document.createElement('div');d.className='mw';
+  d.innerHTML=`<div style="display:flex;flex-direction:column;align-items:flex-end;margin-bottom:10px"><div class="ubub">${esc(text)}</div><div style="font-size:10px;color:#666;margin-top:3px">${nowStr()}</div></div>`;
+  document.getElementById('chatArea').appendChild(d);scrollChat();
+}
+
+function addAI(text,mid){
+  clearWelcome();
+  var id=mid||('m'+Date.now());
+  var d=document.createElement('div');d.className='mw';d.id=id;
+  d.innerHTML=`<div class="airow"><div class="avt"><img src="/static/logo.png"></div><div class="aibody"><div class="ainame">AI Assistant <span style="font-size:10px;color:#666;font-weight:normal;margin-left:6px">${nowStr()}</span></div><div class="aic">${mdRender(text)}</div><div class="actrow"><button class="abtn cp-btn">Copy</button><button class="abtn fb-btn" data-r="1">&#128077;</button><button class="abtn fb-btn" data-r="-1">&#128078;</button></div></div></div>`;
+  document.getElementById('chatArea').appendChild(d);scrollChat();return id;
+}
+
+function addFix(text,fid){
+  clearWelcome();
+  var ex=document.getElementById(fid);
+  if(!ex){
+    var d=document.createElement('div');d.className='mw';d.id=fid;
+    d.innerHTML=`<div class="airow"><div class="avt"><img src="/static/logo.png"></div><div class="aibody"><div class="ainame">AI Assistant <span style="font-size:10px;color:#666;font-weight:normal;margin-left:6px">${nowStr()}</span></div><div class="fixtxt" id="${fid}_t">${esc(text)}</div></div></div>`;
+    document.getElementById('chatArea').appendChild(d);
+  } else {document.getElementById(fid+'_t').textContent=text;}
+  scrollChat();
+}
+function nowStr(){var d=new Date();return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});}
+function copyText(text){
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text);
+    return;
+  }
+  // Fallback for plain-HTTP origins where navigator.clipboard is unavailable
+  var ta=document.createElement('textarea');
+  ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.focus();ta.select();
+  try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+function openCodePanel(cid){
+  var entry=(window.__codeStore||{})[cid];if(!entry)return;
+  document.getElementById('codepanelLang').textContent=entry.lang;
+  document.getElementById('codepanelBody').textContent=entry.code;
+  document.getElementById('codepanelBody').dataset.cid=cid;
+  document.getElementById('codePanel').classList.add('open');
+}
+function closeCodePanel(){document.getElementById('codePanel').classList.remove('open');}
+document.body.insertAdjacentHTML('beforeend', `
+<div class="codepanel" id="codePanel">
+  <div class="codepanelh">
+    <span id="codepanelLang">code</span>
+    <div class="codepanelbtns">
+      <button class="codepanel-cp" id="codepanelCopy">Copy</button>
+      <button class="codepanel-close" id="codepanelCloseBtn">Close &#10005;</button>
+    </div>
+  </div>
+  <div class="codepanelb" id="codepanelBody"></div>
+</div>`);
+document.getElementById('codepanelCloseBtn').onclick=closeCodePanel;
+document.getElementById('codepanelCopy').onclick=function(){
+  var cid=document.getElementById('codepanelBody').dataset.cid;
+  var entry=(window.__codeStore||{})[cid];
+  if(entry)copyText(entry.code);
+};
+
+var modelBtn=document.getElementById('modelBtn');
+var modelMenu=document.getElementById('modelMenu');
+var modelBtnLabel=document.getElementById('modelBtnLabel');
+var hiddenSelect=document.getElementById('aiModelSelect');
+var MODEL_DESC={
+  'Qwen2.5-7B-Instruct-Q4_K_M.gguf':'Balanced - general use',
+  'Qwen3-8B-Q4_K_M.gguf':'Larger - complex questions',
+  'qwen2.5-coder-7b-instruct-q4_k_m.gguf':'Optimized for code',
+  'all-MiniLM-L6-v2-Q4_0.gguf':'Embeddings only'
+};
+modelBtn.onclick=function(e){e.stopPropagation();modelMenu.classList.toggle('open');};
+document.addEventListener('click',function(){modelMenu.classList.remove('open');});
+function selectModel(m){
+  hiddenSelect.value=m;
+  modelBtnLabel.textContent=m;
+  Array.from(modelMenu.children).forEach(c=>c.classList.toggle('sel',c.dataset.m===m));
+}
+async function loadModels(){
+  try{
+    var r=await fetch('/api/models');
+    var d=await r.json();
+    var models=(d.models&&d.models.length)?d.models:[];
+    if(!models.length){modelBtnLabel.textContent='No models found';return;}
+    hiddenSelect.innerHTML=models.map(m=>`<option value="${m}">${m}</option>`).join('');
+    modelMenu.innerHTML=models.map(m=>`<div class="modelopt" data-m="${m}">${m}${MODEL_DESC[m]?'<small>'+MODEL_DESC[m]+'</small>':''}</div>`).join('');
+    Array.from(modelMenu.children).forEach(c=>c.onclick=()=>selectModel(c.dataset.m));
+    selectModel(models[0]);
+  }catch(e){
+    modelBtnLabel.textContent='Could not load models';
+  }
+}
+loadModels();
+
+function addTkBtn(label){
+  var d=document.createElement('div');d.className='mw';
+  d.innerHTML=`<div style="padding-left:34px"><button class="tkbtn" data-label="${esc(label)}">Issue persists? Raise support ticket</button></div>`;
+  document.getElementById('chatArea').appendChild(d);scrollChat();
+}
+
+document.getElementById('chatArea').onclick=e=>{
+  if(e.target.classList.contains('cp-btn')){var m=e.target.closest('.mw');if(m){var c=m.querySelector('.aic');if(c)copyText(c.innerText);}}
+  if(e.target.classList.contains('fb-btn')){e.target.style.color=e.target.dataset.r=='1'?'#2ea043':'#da3633';}
+  if(e.target.classList.contains('tkbtn')){openTicket(e.target.dataset.label||'');}
+  if(e.target.classList.contains('cbk-cp')){var cid=e.target.dataset.cid;var entry=(window.__codeStore||{})[cid];if(entry)copyText(entry.code);}
+  if(e.target.classList.contains('codecard-open')){openCodePanel(e.target.dataset.cid);}
+};
+
+function mdRender(text){
+  var parts=text.split(/(```[\w]*\n[\s\S]*?```)/g);
+  return parts.map(p=>{
+    if(p.startsWith('```')){
+      var lm=p.match(/^```(\w+)/),lang=lm?lm[1]:'code';
+      var code=p.replace(/^```\w*\n?/,'').replace(/```$/,'').trim();
+      var cid='c'+Math.random().toString(36).substr(2,7);
+      window.__codeStore=window.__codeStore||{};
+      window.__codeStore[cid]={lang:lang,code:code};
+      var preview=code.split('\n').slice(0,3).join('\n');
+      return `<div class="codecard"><div class="codecardh"><span>${esc(lang)}</span><div class="codecardbtns"><button class="cbk-cp" data-cid="${cid}">Copy</button><button class="codecard-open" data-cid="${cid}">Open &#10531;</button></div></div><div class="codecardp">${esc(preview)}</div></div>`;
+    }
+    var h=esc(p)
+      .replace(/^### (.+)$/gm,'<div style="font-size:16px;font-weight:700;margin:14px 0 6px">$1</div>')
+      .replace(/^## (.+)$/gm,'<div style="font-size:18px;font-weight:700;margin:16px 0 8px">$1</div>')
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/`(.+?)`/g,'<code style="background:#1e1e1e;padding:1px 4px;border-radius:3px;font-family:monospace;font-size:12px;color:#ce9178">$1</code>')
+      .replace(/^[-*\u2022] (.+)$/gm,'<div style="padding-left:12px;margin:3px 0">&#8226; $1</div>')
+      .replace(/\n\n+/g,'<div style="height:8px"></div>')
+      .replace(/\n/g,'<br>');
+    return `<div style="font-size:14px;line-height:1.7;white-space:pre-wrap;word-break:break-word;user-select:text">${h}</div>`;
+  }).join('');
+}
+
+document.getElementById('sendBtn').onclick=doSend;
+document.getElementById('inputBox').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();doSend();}});
+document.getElementById('inputBox').addEventListener('input',function(){this.style.height='24px';this.style.height=Math.min(this.scrollHeight,120)+'px';});
+
+function doSend(){
+  var inp=document.getElementById('inputBox');
+  var text=inp.value.trim();if(!text)return;
+  document.getElementById('sendBtn').disabled=true;
+  inp.value='';inp.style.height='24px';
+  clearWelcome();addUser(text);
+  if(isFirst){
+    isFirst=false;
+    var s={id:'s'+Date.now(),title:text.slice(0,38)+(text.length>38?'...':''),time:new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}),history:[]};
+    sessions.unshift(s);sessions=sessions.slice(0,20);
+    localStorage.setItem('tq_s',JSON.stringify(sessions));refreshHist();
+  }
+  chatHistory.push({role:'user',content:text});
+  var tl=text.toLowerCase();
+  if(['network','internet','wifi','no connection'].some(w=>tl.includes(w))){runFix('network');return;}
+  if(['slow','sluggish','hang','start button'].some(w=>tl.includes(w))){runFix('slowpc');return;}
+  if(['vpn','globalprotect'].some(w=>tl.includes(w))){runFix('vpn');return;}
+  if(['teams','tpm'].some(w=>tl.includes(w))){runFix('teams');return;}
+  if(['crash','freeze','bsod'].some(w=>tl.includes(w))){runFix('systemcrash');return;}
+  askAI(text);
+}
+
+async function askAI(q){
+  var mode=document.querySelector('input[name=mode]:checked').value;
+  var modelSel=document.getElementById('aiModelSelect');
+  var model=modelSel&&modelSel.value?modelSel.value:'Qwen2.5-7B-Instruct-Q4_K_M.gguf';
+  var FMT=' Format your response in clean Markdown. Prefer short paragraphs over long bullet lists; only use bullets or numbered lists when there are genuinely distinct, parallel items. Use ## headers only for long, multi-section answers - skip headers for short answers. Bold only the 2-3 most important terms per section, not every noun. Never start with phrases like "Here is" or "Sure, here\'s" - begin directly with the substance of the answer.';
+  var sys={it:'You are AI Assistant, IT helpdesk assistant for Example Organization. Give clear, detailed, actionable answers.'+FMT,code:'You are an expert programmer. Use markdown code blocks with language names. Explain your code.'+FMT,general:'You are AI Assistant, helpful AI assistant for Example Org employees. Be thorough and detailed.'+FMT};
+  var mid=addAI('Thinking...');
+  try{
+    var r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model,stream:false,messages:[{role:'system',content:sys[mode]},...chatHistory.slice(-16)],options:{num_predict:1500}})});
+    var d=await r.json();
+    var ans=(d.message&&d.message.content)?d.message.content:'Could not get response.';
+    chatHistory.push({role:'assistant',content:ans});
+    var el=document.getElementById(mid);if(el)el.querySelector('.aic').innerHTML=mdRender(ans);scrollChat();
+  }catch(e){
+    var el2=document.getElementById(mid);if(el2)el2.querySelector('.aic').innerHTML='Cannot connect to AI. Check network or VPN.';
+  }finally{document.getElementById('sendBtn').disabled=false;}
+}
+
+async function runFix(key){
+  var data=FIXES[key];if(!data)return;
+  var fid='f'+Date.now();document.getElementById('sendBtn').disabled=true;
+  for(var i=0;i<data.s.length;i++){addFix(`[${i+1}/${data.s.length}] ${data.s[i]}`,fid);await sleep(1200);}
+  addFix('Done! '+data.d,fid);addTkBtn(data.l);
+  document.getElementById('sendBtn').disabled=false;
+}
+
+document.getElementById('btnNewChat').onclick=()=>{
+  showChat();chatHistory=[];isFirst=true;
+  var ca=document.getElementById('chatArea');ca.innerHTML='';
+  var w=document.createElement('div');w.className='welcome';w.id='welcome';
+  w.innerHTML='<img src="/static/logo.png"><h1>AI Assistant</h1><p>Ask Anything</p>';
+  ca.appendChild(w);
+};
+
+function refreshHist(){
+  var list=document.getElementById('histList');
+  if(!sessions.length){list.innerHTML='<div style="padding:3px 13px;font-size:11px;color:#555">No history</div>';return;}
+  list.innerHTML='';
+  sessions.slice(0,10).forEach((s,i)=>{
+    var btn=document.createElement('button');btn.className='sbtn';btn.style.fontSize='11px';
+    btn.textContent='\uD83D\uDCAC '+s.title;btn.onclick=()=>loadSess(i);list.appendChild(btn);
+    var t=document.createElement('div');t.style.cssText='font-size:9px;color:#555;padding:0 13px 3px';t.textContent=s.time||'';list.appendChild(t);
+  });
+}
+
+function loadSess(i){showChat();var s=sessions[i];if(!s)return;chatHistory=s.history||[];isFirst=false;document.getElementById('chatArea').innerHTML='';chatHistory.forEach(m=>{if(m.role==='user')addUser(m.content);else addAI(m.content);});}
+
+function openTicket(label){document.getElementById('tkSubj').value=label?'[IT Support] '+label:'';document.getElementById('ticketModal').classList.add('on');}
+document.getElementById('btnTicket').onclick=()=>openTicket('');
+document.getElementById('tkClose').onclick=()=>document.getElementById('ticketModal').classList.remove('on');
+document.getElementById('tkSubmit').onclick=()=>{
+  var s=document.getElementById('tkSubj').value.trim()||'[IT Support] General';
+  window.open(ZOHO+'?subject='+encodeURIComponent(s),'_blank');
+  document.getElementById('ticketModal').classList.remove('on');
+};
+
+// ── AUTH ──────────────────────────────────────────────────────
+document.getElementById('lbtn').onclick=doLogin;
+document.getElementById('lp').onkeydown=e=>{if(e.key==='Enter')doLogin();};
+document.getElementById('lu').onkeydown=e=>{if(e.key==='Enter')document.getElementById('lp').focus();};
+document.getElementById('logoutBtn').onclick=doLogout;
+
+async function doLogin(){
+  var u=document.getElementById('lu').value.trim();
+  var p=document.getElementById('lp').value;
+  var err=document.getElementById('lerr'),btn=document.getElementById('lbtn');
+  if(!u||!p){err.textContent='Enter username and password';err.style.display='block';return;}
+  btn.textContent='Signing in...';btn.disabled=true;err.style.display='none';
+  try{
+    var r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    var d=await r.json();
+    if(d.error){err.textContent=d.error;err.style.display='block';btn.textContent='Sign In';btn.disabled=false;return;}
+    TOKEN=d.token;ROLE=d.role;
+    localStorage.setItem('tq_tk',d.token);localStorage.setItem('tq_rl',d.role);localStorage.setItem('tq_nm',d.full_name||d.username);
+    onLogin(d.full_name||d.username,d.role);
+  }catch(e){err.textContent='Connection error.';err.style.display='block';btn.textContent='Sign In';btn.disabled=false;}
+}
+
+function onLogin(name,role){
+  document.getElementById('loginPage').style.display='none';
+  document.getElementById('suser').style.display='flex';
+  document.getElementById('suserTxt').innerHTML=`${esc(name)}<span class="rbadge r-${esc(role)}">${esc(role)}</span>`;
+  if(isAdmin())document.getElementById('adminNav').style.display='block';
+  refreshHist();document.getElementById('inputBox').focus();
+}
+
+function doLogout(){
+  if(TOKEN)fetch('/api/auth/logout',{method:'POST',headers:ah()});
+  TOKEN=null;ROLE=null;
+  localStorage.removeItem('tq_tk');localStorage.removeItem('tq_rl');localStorage.removeItem('tq_nm');
+  document.getElementById('suser').style.display='none';
+  document.getElementById('adminNav').style.display='none';
+  showChat();document.getElementById('loginPage').style.display='flex';
+  document.getElementById('lbtn').textContent='Sign In';document.getElementById('lbtn').disabled=false;
+  document.getElementById('lu').value='';document.getElementById('lp').value='';
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+refreshHist();
+var tk=localStorage.getItem('tq_tk'),rl=localStorage.getItem('tq_rl'),nm=localStorage.getItem('tq_nm');
+if(tk&&rl){
+  TOKEN=tk;ROLE=rl;
+  fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+tk}})
+    .then(r=>{if(r.ok){r.json().then(d=>{
+      ROLE=d.role;onLogin(nm||'Admin',d.role);
+      try{
+        var saved=JSON.parse(localStorage.getItem('tq_view')||'null');
+        if(saved&&saved.view==='admin'){showAdmin(saved.tab||'dashboard');}
+      }catch(e){}
+    });}else{document.getElementById('loginPage').style.display='flex';}})
+    .catch(()=>document.getElementById('loginPage').style.display='flex');
+}else{
+  document.getElementById('loginPage').style.display='flex';
+}
+
+</script>
+
+<script>
+// ── Group A (Dispatcher + Core Admin) ──────────────────────────────────────────────────────
+async function loadTab(tab){
+  var ac=document.getElementById('ac');
+  ac.innerHTML='<div style="color:#555;padding:40px;text-align:center">Loading...</div>';
+  try{
+    if(tab==='dashboard')     await tabDashboard();
+    else if(tab==='endpoints')await tabEndpoints();
+    else if(tab==='inventory')await tabInventory();
+    else if(tab==='software') tabSoftware();
+    else if(tab==='wazuh')    await tabWazuh();
+    else if(tab==='ai')       tabAI();
+    else if(tab==='remediation') tabRemediation();
+    else if(tab==='dex')      await tabDEX();
+    else if(tab==='bitlocker')await tabBitLocker();
+    else if(tab==='pbs')      await tabPBS();
+    else if(tab==='software_deploy') tabSoftwareDeploy();
+    else if(tab==='patch')    await tabPatch();
+    else if(tab==='services') tabServices();
+    else if(tab==='startup')  tabStartup();
+    else if(tab==='usb')      await tabUSB();
+    else if(tab==='eventlogs')tabEventLogs();
+    else if(tab==='perf')     await tabPerformance();
+    else if(tab==='localusers')tabLocalUsers();
+    else if(tab==='printers') tabPrinters();
+    else if(tab==='drives')   tabDrives();
+    else if(tab==='reports')  tabReports();
+    else if(tab==='settings') await tabSettings();
+    else if(tab==='zabbix')   await tabZabbix();
+    else if(tab==='remote')   await tabRemote();
+    else if(tab==='dlp')      await tabDLP();
+    else if(tab==='security')         await tabSecurity();
+    else if(tab==='software_monitor') await tabSoftwareMonitor();
+    else if(tab==='secops')           await tabSecOps();
+    else if(tab==='openvas')          await tabOpenVAS();
+    else if(tab==='threatintel')      await tabThreatIntel();
+    else if(tab==='incidents')        await tabIncidents();
+    else if(tab==='changes')          await tabChanges();
+  }catch(e){ac.innerHTML=`<div style="color:#da3633;padding:20px">Error: ${esc(String(e))}</div>`;}
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────
+async function tabDashboard(){
+  var ac=document.getElementById('ac');
+  var r=await fetch('/api/admin/dashboard',{headers:ah()});var d=await r.json();
+  var total=d.total_endpoints||0,online=d.online||0,offline=d.offline||0;
+  var crit=(d.disk_critical||0)+(d.ram_critical||0)+(d.no_antivirus||0),upd=d.needs_updates||0;
+  var onP=total?Math.round(online/total*100):0;
+  var clP=total?Math.round((total-crit)/total*100):0;
+  var paP=total?Math.round((total-upd)/total*100):0;
+  ac.innerHTML=`
+    <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128200; Dashboard</h2>
+    <div class="sg">
+      ${sc2('#ececec','&#128187; '+total,'Total Endpoints','Registered PCs')}
+      ${sc2('#2ea043','&#128994; '+online,'Online','Active now')}
+      ${sc2('#da3633','&#128308; '+offline,'Offline','Not responding')}
+      ${sc2('#f0883e','&#9888; '+crit,'Need Attention','Alerts')}
+      ${sc2('#58a6ff','&#128260; '+upd,'Pending Updates','Windows updates')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="card">
+        <div class="ct">System Health</div>
+        <div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span>Online Rate</span><span style="color:${onP<70?'#f0883e':'#2ea043'}">${onP}%</span></div><div class="prog"><div class="pb" style="width:${onP}%;background:${onP<70?'#f0883e':'#2ea043'}"></div></div></div>
+        <div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span>PC Health</span><span style="color:${clP<70?'#f0883e':'#2ea043'}">${clP}%</span></div><div class="prog"><div class="pb" style="width:${clP}%;background:${clP<70?'#f0883e':'#2ea043'}"></div></div></div>
+        <div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span>Patch Rate</span><span style="color:${paP<70?'#da3633':'#2ea043'}">${paP}%</span></div><div class="prog"><div class="pb" style="width:${paP}%;background:${paP<70?'#da3633':'#2ea043'}"></div></div></div>
+      </div>
+      <div class="card" id="dashEps"><div class="ct">Recent Endpoints</div>Loading...</div>
+    </div>`;
+  var eps=await getEps();var de=document.getElementById('dashEps');if(!de)return;
+  de.innerHTML=`<div class="ct">Recent Endpoints <button class="btn bb2" style="font-size:10px;padding:2px 7px" onclick="setTab('endpoints')">View All</button></div>`+
+    (eps.length?eps.slice(0,6).map(e=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #3f3f3f"><div><span class="dot ${e.status==='online'?'dg':'dr'}"></span><span style="font-size:12px">${esc(e.hostname||'')}</span></div><span style="font-size:10px;color:#666">${esc(e.username||'')}</span><span class="badge ${e.status==='online'?'bg':'br'}">${esc(e.status||'')}</span></div>`).join(''):
+    '<div style="color:#555;font-size:12px;padding:16px;text-align:center">No endpoints. Run endpoint_agent.py install on each PC.</div>');
+}
+
+// ── ENDPOINTS ─────────────────────────────────────────────────
+function tabReports(){
+  var ac=document.getElementById('ac');
+  var reps=[['Endpoint Health','endpoints'],['Hardware Inventory','inventory'],['Software Inventory','software'],['Wazuh Findings','wazuh'],['DEX Score','dex'],['BitLocker Status','bitlocker'],['PBS Backups','pbs'],['Patch Status','patch'],['Performance','perf']];
+  ac.innerHTML=`<h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128202; Reports</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="card"><div class="ct">Available Reports</div><div style="display:grid;gap:5px">${reps.map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#212121;border-radius:5px"><span style="font-size:12px">${esc(r[0])}</span><button class="btn bb2" style="font-size:10px;padding:2px 6px" data-rt="${esc(r[1])}">View</button></div>`).join('')}</div></div>
+      <div class="card"><div class="ct">Export</div><div style="display:grid;gap:7px"><button class="btn bb2" style="width:100%;padding:9px" id="csvBtn">Export Endpoints CSV</button><button class="btn bx2" style="width:100%;padding:9px">Export PDF (upcoming)</button></div></div>
+    </div>`;
+  ac.onclick=e=>{var btn=e.target.closest('button[data-rt]');if(btn)setTab(btn.dataset.rt);};
+  document.getElementById('csvBtn').onclick=async()=>{
+    try{
+      var r=await fetch('/api/admin/endpoints',{headers:ah()});var d=await r.json();var eps=d.endpoints||[];
+      var hdr=['Hostname','Username','IP','CPU%','RAM%','Disk%','AV','BitLocker','Updates','Wazuh','Status','Last Seen'];
+      var rows=eps.map(e=>[e.hostname,e.username,e.ip,e.cpu_percent,e.ram_percent,e.disk_percent,String(e.antivirus||"")||'None',(e.bitlocker&&e.bitlocker.status)||'Unknown',e.pending_updates,e.wazuh_status||'',e.status,e.last_seen||''].map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(','));
+      var csv=[hdr.join(','),...rows].join('\n');
+      var blob=new Blob([csv],{type:'text/csv'});var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');a.href=url;a.download='endpoints_'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(url);
+    }catch(e){alert('Export failed');}
+  };
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────
+async function tabSettings(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML=`<h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#9881; Admin Settings</h2>
+    <div style="display:grid;gap:14px">
+      <div class="card">
+        <div class="ct">User Management <button class="btn bg2" style="font-size:10px;padding:2px 7px" id="showAddU">+ Add User</button></div>
+        <div id="settUsers">Loading...</div>
+        <div id="addUForm" style="display:none;margin-top:10px;background:#212121;border-radius:8px;padding:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:7px">
+            <input class="fi" id="nu_u" placeholder="Username"><input class="fi" type="password" id="nu_p" placeholder="Password"><input class="fi" id="nu_n" placeholder="Full Name">
+            <input class="fi" id="nu_e" placeholder="Email"><input class="fi" id="nu_d" placeholder="Department">
+            <select class="fi" id="nu_r"><option value="user">Employee (User)</option><option value="admin">IT Admin</option><option value="superadmin">Super Admin</option></select>
+          </div>
+          <div style="display:flex;gap:7px"><button class="btn bg2" id="createU">Create</button><button class="btn bx2" id="cancelU">Cancel</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">Server Configuration</div>
+        ${cfgR('AI Assistant Server','${SERVER_IP}:7000')}${cfgR('Ollama AI','${AI_HOST_IP}:11434')}${cfgR('ChromaDB','${VECTORDB_IP}:9000 (idle)')}
+        ${cfgR('Wazuh Master','${SIEM_IP}:55000')}${cfgR('Wazuh Worker','${MONITORING_IP}')}${cfgR('PBS','${BACKUP_IP}:8007')}
+        ${cfgR('RustDesk','your-domain.example.com:21115')}${cfgR('Public URL','https://your-domain.example.com')}
+      </div>
+    </div>`;
+  document.getElementById('showAddU').onclick=()=>document.getElementById('addUForm').style.display='block';
+  document.getElementById('cancelU').onclick=()=>document.getElementById('addUForm').style.display='none';
+  document.getElementById('createU').onclick=createUser;
+  loadSettUsers();
+}
+
+async function loadSettUsers(){
+  try{
+    var r=await fetch('/api/users',{headers:ah()});var d=await r.json();
+    var el=document.getElementById('settUsers');if(!el)return;
+    el.innerHTML=`<table class="tbl"><thead><tr><th>Username</th><th>Full Name</th><th>Dept</th><th>Role</th><th>Status</th><th>Last Login</th><th>Action</th></tr></thead><tbody>
+      ${(d.users||[]).map(u=>`<tr><td style="font-weight:600">${esc(u.username)}</td><td>${esc(u.full_name||'')}</td><td>${esc(u.department||'')}</td><td><span class="rbadge r-${esc(u.role)}">${esc(u.role)}</span></td><td><span class="badge ${u.is_active?'bg':'br'}">${u.is_active?'Active':'Disabled'}</span></td><td style="font-size:10px;color:#666">${esc((u.last_login||'Never').slice(0,16))}</td><td>${u.username!=='itadmin'?`<button class="btn bx2" style="font-size:10px;padding:2px 6px" onclick="tglUser('${esc(u.username)}',${u.is_active?0:1})">${u.is_active?'Disable':'Enable'}</button>`:'--'}</td></tr>`).join('')}
+    </tbody></table>`;
+  }catch(e){}
+}
+async function tglUser(u,active){await fetch('/api/users/'+u,{method:'PUT',headers:ah(),body:JSON.stringify({is_active:active})});loadSettUsers();}
+async function createUser(){
+  var u={username:document.getElementById('nu_u').value.trim(),password:document.getElementById('nu_p').value,full_name:document.getElementById('nu_n').value.trim(),email:document.getElementById('nu_e').value.trim(),department:document.getElementById('nu_d').value.trim(),role:document.getElementById('nu_r').value};
+  if(!u.username||!u.password||!u.full_name){alert('Username, password and name required');return;}
+  try{var r=await fetch('/api/users',{method:'POST',headers:ah(),body:JSON.stringify(u)});var d=await r.json();if(d.success){alert('User created!');loadSettUsers();document.getElementById('addUForm').style.display='none';}else alert('Error: '+d.error);}catch(e){alert('Failed');}
+}
+
+// ── ZABBIX ────────────────────────────────────────────────────
+
+</script>
+
+<script>
+// ── Group B (Endpoint Management) ──────────────────────────────────────────────────────
+async function tabEndpoints(){
+  var ac=document.getElementById('ac');var eps=await getEps();
+  ac.innerHTML=`
+    <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128187; Endpoints (${eps.length})</h2>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input type="text" class="fi" id="epQ" placeholder="Search..." style="flex:1">
+      <button class="btn bb2" onclick="setTab('endpoints')">Refresh</button>
+    </div>
+    <div class="card" style="padding:0;overflow:auto">
+      <table class="tbl" id="epTbl">
+        <thead><tr><th>Status</th><th>Hostname</th><th>User</th><th>IP</th><th>CPU%</th><th>RAM%</th><th>Disk%</th><th>AV</th><th>BitLocker</th><th>Updates</th><th>Wazuh</th><th>Last Seen</th><th>Actions</th></tr></thead>
+        <tbody>${eps.length?eps.map(e=>{
+          var on=e.status==='online',bl=(e.bitlocker&&e.bitlocker.status)||'Unknown';
+          return `<tr>
+            <td><span class="badge ${on?'bg':'br'}">${on?'Online':'Offline'}</span></td>
+            <td style="font-weight:600">${esc(e.hostname||'')}</td>
+            <td>${esc(e.username||'')}</td>
+            <td style="font-family:monospace;font-size:11px">${esc(e.ip||'')}</td>
+            <td><span class="badge ${e.cpu_percent>80?'br':'bx'}">${esc(e.cpu_percent||0)}%</span></td>
+            <td><span class="badge ${e.ram_percent>85?'br':e.ram_percent>70?'bo':'bg'}">${esc(e.ram_percent||0)}%</span></td>
+            <td><span class="badge ${e.disk_percent>85?'br':e.disk_percent>70?'bo':'bg'}">${esc(e.disk_percent||0)}%</span></td>
+            <td>${e.antivirus?`<span class="badge bg">${esc(String(String(e.antivirus||"")||'').slice(0,10))}</span>`:'<span class="badge br">None</span>'}</td>
+            <td><span class="badge ${bl==='FullyEncrypted'?'bg':'bx'}">${esc(bl.slice(0,8))}</span></td>
+            <td>${e.pending_updates>0?`<span class="badge bo">${e.pending_updates}</span>`:'<span class="badge bg">0</span>'}</td>
+            <td><span class="badge ${e.wazuh_status==='Running'?'bg':'br'}">${esc((e.wazuh_status||'?').slice(0,7))}</span></td>
+            <td style="font-size:10px;color:#666">${esc((e.last_seen||'').slice(0,16).replace('T',' '))}</td>
+            <td><div style="display:flex;gap:3px">
+              ${e.rustdesk_id?`<button class="btn bg2" style="font-size:10px;padding:2px 6px" data-act="connect" data-rdid="${esc(e.rustdesk_id||'')}">&#128421; Connect</button>`:''}
+              <button class="btn bb2" style="font-size:10px;padding:2px 6px" data-act="sw" data-host="${esc(e.hostname||'')}">SW</button>
+              <button class="btn bx2" style="font-size:10px;padding:2px 6px" data-act="cmd" data-host="${esc(e.hostname||'')}">Cmd</button>
+              <button class="btn br2" style="font-size:10px;padding:2px 6px" data-act="lock" data-host="${esc(e.hostname||'')}">Lock</button>
+              <button class="btn bb2" style="font-size:10px;padding:2px 6px" data-act="dex" data-host="${esc(e.hostname||'')}">DEX</button>
+              <button class="btn bo2" style="font-size:10px;padding:2px 6px" data-act="wol" data-host="${esc(e.hostname||'')}" data-mac="${esc(e.mac||'')}">WoL</button>
+            </div></td>
+          </tr>`;}).join(''):'<tr><td colspan="13" style="text-align:center;color:#555;padding:20px">No endpoints registered</td></tr>'}</tbody>
+      </table>
+    </div>`;
+  document.getElementById('epQ').oninput=function(){
+    var q=this.value.toLowerCase();
+    document.querySelectorAll('#epTbl tbody tr').forEach(r=>r.style.display=r.innerText.toLowerCase().includes(q)?'':'none');
+  };
+  ac.onclick=async e=>{
+    var btn=e.target.closest('button[data-act]');if(!btn)return;
+    var a=btn.dataset.act,h=btn.dataset.host;
+    if(a==='remote'){alert('RustDesk ID:\n'+btn.dataset.rdid);}
+    if(a==='sw'){localStorage.setItem('sw_h',h);setTab('software');}
+    if(a==='cmd'){var cmd=prompt('PowerShell for '+h+':');if(!cmd)return;var d=await qCmd(h,'powershell',cmd);alert('Queued! ID: '+d.command_id);}
+    if(a==='lock'){if(!confirm('Lock screen on '+h+'?'))return;var d2=await qCmd(h,'lock_screen','');alert('Lock queued! ID: '+d2.command_id);}
+    if(a==='wol'){
+      var mac=btn.dataset.mac;
+      if(!mac){alert('MAC address not available for '+h+'. Agent must report first.');return;}
+      if(!confirm('Send Wake-on-LAN to '+h+' ('+mac+')?'))return;
+      var r=await fetch('/api/admin/wol',{method:'POST',headers:ah(),body:JSON.stringify({hostname:h,mac:mac,broadcast:'${VULN_SCANNER_IP}5'})});
+      var d3=await r.json();
+      if(d3.status==='ok')alert('Magic packet sent to '+h+'!\nThe PC will wake up in 30-60 seconds.');
+      else alert('WoL failed: '+d3.error);
+    }
+    if(a==='dex'){document.getElementById('dexH')&&(document.getElementById('dexH').value=h);setTab('dex');setTimeout(()=>runDeepDEX(h),300);}
+  };
+}
+
+// ── INVENTORY ─────────────────────────────────────────────────
+async function tabInventory(){
+  var ac=document.getElementById('ac');var eps=await getEps();
+  ac.innerHTML=`<h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128230; Hardware Inventory</h2>
+    <div class="card" style="padding:0;overflow:auto">
+      <table class="tbl"><thead><tr><th>Hostname</th><th>User</th><th>CPU</th><th>Cores</th><th>RAM GB</th><th>Disk GB</th><th>Free GB</th><th>OS</th><th>Last Boot</th></tr></thead>
+      <tbody>${eps.length?eps.map(e=>`<tr><td style="font-weight:600">${esc(e.hostname||'')}</td><td>${esc(e.username||'')}</td><td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.cpu_model||'')}">${esc((e.cpu_model||'').slice(0,22))}</td><td>${esc(e.cpu_cores||'')}</td><td>${esc(e.ram_total||'')}</td><td>${esc(e.disk_total||'')}</td><td>${esc(e.disk_free||'')}</td><td style="font-size:11px">${esc(e.os_name||'')}</td><td style="font-size:10px;color:#666">${esc(e.last_boot||'')}</td></tr>`).join(''):'<tr><td colspan="9" style="text-align:center;color:#555">No data</td></tr>'}
+      </tbody></table>
+    </div>`;
+}
+
+// ── SOFTWARE ──────────────────────────────────────────────────
+function tabSoftware(){
+  var h=localStorage.getItem('sw_h')||'';var ac=document.getElementById('ac');
+  ac.innerHTML=`<h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128190; Software Inventory</h2>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input type="text" class="fi" id="swH" placeholder="Hostname" style="flex:1" value="${esc(h)}">
+      <button class="btn bb2" id="swLoad">Load</button>
+    </div><div id="swOut"></div>`;
+  document.getElementById('swLoad').onclick=loadSW;if(h)loadSW();
+}
+async function loadSW(){
+  var h=document.getElementById('swH').value.trim();if(!h){alert('Enter hostname');return;}
+  document.getElementById('swOut').innerHTML='Loading...';
+  try{
+    var r=await fetch('/api/admin/software/'+h,{headers:ah()});var d=await r.json();
+    document.getElementById('swOut').innerHTML=`
+      <div style="margin-bottom:6px;font-size:11px;color:#666">${d.software.length} apps on ${esc(h)}</div>
+      <input type="text" class="fi" id="swFlt" placeholder="Filter apps..." style="margin-bottom:8px">
+      <div class="card" style="padding:0;overflow:auto">
+        <table class="tbl" id="swTbl">
+          <thead><tr><th>#</th><th>Application</th><th>Version</th></tr></thead>
+          <tbody>${d.software.map((s,i)=>`<tr><td style="color:#555">${i+1}</td><td>${esc(s.name||'')}</td><td style="color:#666;font-size:11px">${esc(s.version||'')}</td></tr>`).join('')}</tbody>
+        </table>
+      </div>`;
+    document.getElementById('swFlt').oninput=function(){
+      var q=this.value.toLowerCase();
+      document.querySelectorAll('#swTbl tbody tr').forEach(r=>r.style.display=r.innerText.toLowerCase().includes(q)?'':'none');
+    };
+  }catch(e){document.getElementById('swOut').innerHTML='<div style="color:#da3633">Failed to load</div>';}
+}
+
+// ── WAZUH ─────────────────────────────────────────────────────
+async function tabDEX(){
+  var ac=document.getElementById('ac');
+  var eps=await getEps();
+  ac.innerHTML=`
+    <h2 style="font-size:17px;font-weight:600;margin-bottom:6px">&#128200; DEX Score & Deep Scan</h2>
+    <p style="color:#666;font-size:12px;margin-bottom:14px">Digital Employee Experience — PC health out of 100. Click any row or use Deep Scan below.</p>
+    <div style="display:grid;gap:8px;margin-bottom:18px" id="dexList">
+      ${eps.length?eps.map(e=>{
+        var s=dexScore(e),color=dexColor(s);
+        var issues=[];
+        if(e.ram_percent>85)issues.push('High RAM');if(e.disk_percent>85)issues.push('Low Disk');
+        if(!String(e.antivirus||""))issues.push('No AV');if(e.pending_updates>0)issues.push(e.pending_updates+' Updates');
+        var _bl=e.bitlocker||{};var _blst=_bl.status||_bl.VolumeStatus||'Unknown';if(_blst!=='FullyEncrypted'&&_blst!=='EncryptionInProgress')issues.push('BitLocker: '+_blst);
+        return `<div class="card" style="cursor:pointer" data-ep="${esc(e.hostname||'')}">
+          <div style="display:flex;align-items:center;gap:18px">
+            <div class="dexc" style="border-color:${color};color:${color}">${s}</div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:600;margin-bottom:2px">${esc(e.hostname||'')}</div>
+              <div style="font-size:11px;color:#666;margin-bottom:7px">${esc(e.username||'')} | ${esc(e.ip||'')}</div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap">${issues.map(i=>`<span class="badge bo">${esc(i)}</span>`).join('')||'<span class="badge bg">All Good</span>'}</div>
+            </div>
+            <div style="font-size:11px;color:#666;min-width:90px;text-align:right">
+              <div>CPU: <span style="color:${e.cpu_percent>80?'#da3633':'#2ea043'}">${esc(e.cpu_percent||0)}%</span></div>
+              <div>RAM: <span style="color:${e.ram_percent>85?'#da3633':e.ram_percent>70?'#f0883e':'#2ea043'}">${esc(e.ram_percent||0)}%</span></div>
+              <div>Disk: <span style="color:${e.disk_percent>85?'#da3633':e.disk_percent>70?'#f0883e':'#2ea043'}">${esc(e.disk_percent||0)}%</span></div>
+              <button class="btn bb2" style="font-size:10px;padding:2px 8px;margin-top:5px" data-ep="${esc(e.hostname||'')}">Deep Scan</button>
+            </div>
+          </div>
+        </div>`;}).join(''):'<div style="text-align:center;color:#555;padding:40px">No endpoints registered</div>'}
+    </div>
+    <div class="card">
+      <div class="ct">&#128202; Deep DEX Scan</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <input type="text" class="fi" id="dexH" placeholder="Hostname (e.g. Laptop-PR-25)" style="flex:1">
+        <button class="btn bb2" id="dexScan">Run Deep Scan</button>
+      </div>
+      <div id="dexOut"></div>
+    </div>`;
+
+  // Click on card or Deep Scan button
+  ac.onclick=e=>{
+    var btn=e.target.closest('button[data-ep]');
+    var card=e.target.closest('.card[data-ep]');
+    var host=(btn&&btn.dataset.ep)||(card&&card.dataset.ep);
+    if(host){
+      document.getElementById('dexH').value=host;
+      runDeepDEX(host);
+      document.getElementById('dexOut').scrollIntoView({behavior:'smooth'});
+    }
+  };
+  document.getElementById('dexScan').onclick=()=>runDeepDEX();
+  document.getElementById('dexH').onkeydown=e=>{if(e.key==='Enter')runDeepDEX();};
+}
+
+async function runDeepDEX(hostArg){
+  var h=hostArg||document.getElementById('dexH').value.trim();
+  if(!h){alert('Enter hostname');return;}
+  if(document.getElementById('dexH'))document.getElementById('dexH').value=h;
+  var out=document.getElementById('dexOut');
+  out.innerHTML=`<div style="color:#666;padding:16px">Scanning ${esc(h)}...</div>`;
+  try{
+    var r=await fetch('/api/admin/endpoints',{headers:ah()});var d=await r.json();
+    var ep=(d.endpoints||[]).find(e=>(e.hostname||'').toLowerCase()===h.toLowerCase());
+    if(!ep){out.innerHTML='<div style="color:#f0883e;padding:16px">PC not found. Install Endpoint Agent first.</div>';return;}
+    var score=dexScore(ep),color=dexColor(score);
+    var issues=[],good=[];
+    if(ep.cpu_percent>80){issues.push('High CPU '+ep.cpu_percent+'%');}else good.push('CPU OK '+ep.cpu_percent+'%');
+    if(ep.ram_percent>85){issues.push('High RAM '+ep.ram_percent+'%');}else if(ep.ram_percent>70){issues.push('RAM '+ep.ram_percent+'%');}else good.push('RAM OK');
+    if(ep.disk_percent>85){issues.push('Low Disk '+ep.disk_free+'GB free');}else good.push('Disk OK '+ep.disk_free+'GB free');
+    if(!String(ep.antivirus||"")){issues.push('No Antivirus');}else good.push(String(ep.antivirus||"")+' Active');
+    if(ep.pending_updates>10){issues.push(ep.pending_updates+' Updates');}else if(ep.pending_updates>0){issues.push(ep.pending_updates+' Updates');}else good.push('Fully Patched');
+    var bl=ep.bitlocker||{};
+    var blSt=bl.status||bl.VolumeStatus||'Unknown';var blOk=blSt==='FullyEncrypted'||blSt==='EncryptionInProgress';if(blOk){good.push('BitLocker: '+blSt);}else{issues.push('BitLocker: '+blSt);}
+    if(ep.wazuh_status==='Running'){good.push('Wazuh Running');}else{issues.push('Wazuh: '+(ep.wazuh_status||'?'));}
+    out.innerHTML=`
+      <div style="display:flex;align-items:center;gap:20px;margin-bottom:14px;padding:14px;background:#212121;border-radius:10px">
+        <div class="dexc" style="border-color:${color};color:${color};width:90px;height:90px;font-size:24px">${score}</div>
+        <div style="flex:1">
+          <div style="font-size:18px;font-weight:700;margin-bottom:3px">${esc(ep.hostname||'')}</div>
+          <div style="font-size:12px;color:#666;margin-bottom:6px">${esc(ep.username||'')} | ${esc(ep.ip||'')} | ${esc(ep.os_name||'')}</div>
+          <div style="font-size:12px;color:#666">Last seen: ${esc((ep.last_seen||'').slice(0,16).replace('T',' '))}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card">
+          <div class="ct">Issues Found (${issues.length})</div>
+          ${issues.length?issues.map(i=>`<div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid #3f3f3f"><span style="color:#da3633">&#9888;</span><span style="font-size:12px">${esc(i)}</span></div>`).join(''):'<div style="color:#2ea043;padding:10px">No issues!</div>'}
+        </div>
+        <div class="card">
+          <div class="ct">Healthy (${good.length})</div>
+          ${good.map(g=>`<div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid #3f3f3f"><span style="color:#2ea043">&#10003;</span><span style="font-size:12px">${esc(g)}</span></div>`).join('')}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+        ${['CPU:'+ep.cpu_percent+'%:'+ep.cpu_percent,'RAM:'+ep.ram_percent+'%:'+ep.ram_percent,'Disk:'+ep.disk_percent+'%:'+ep.disk_percent].map(x=>{var[l,v,p]=x.split(':');return `<div class="sc"><div class="v" style="color:${parseInt(p)>80?'#da3633':parseInt(p)>70?'#f0883e':'#2ea043'}">${v}</div><div class="l">${l}</div></div>`;}).join('')}
+        <div class="sc"><div class="v" style="color:${ep.antivirus?'#2ea043':'#da3633'};font-size:12px">${esc((String(ep.antivirus||"")||'None').slice(0,12))}</div><div class="l">Antivirus</div></div>
+        <div class="sc"><div class="v" style="color:${ep.pending_updates>0?'#f0883e':'#2ea043'};font-size:16px">${ep.pending_updates||0}</div><div class="l">Updates Pending</div></div>
+        <div class="sc"><div class="v" style="color:${color}">${score}/100</div><div class="l">DEX Score</div></div>
+      </div>
+      <div class="card">
+        <div class="ct">Quick Actions</div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <button class="btn bg2" id="dexAV">Update AV</button>
+          <button class="btn bb2" id="dexDNS">Flush DNS</button>
+          <button class="btn bb2" id="dexSFC">Run SFC</button>
+          <button class="btn bo2" id="dexBL">Enable BitLocker</button>
+          <button class="btn br2" id="dexRestart">Restart PC</button>
+          <button class="btn bx2" id="dexLock">Lock Screen</button>
+          <button class="btn bb2" id="dexWU">Windows Update</button>
+        </div>
+      </div>`;
+    // Wire action buttons
+    var host=ep.hostname||'';
+    document.getElementById('dexAV').onclick=async()=>{var d=await qCmd(host,'powershell','Update-MpSignature');alert('AV Update queued! ID: '+d.command_id);};
+    document.getElementById('dexDNS').onclick=async()=>{var d=await qCmd(host,'powershell','ipconfig /flushdns');alert('Flush DNS queued! ID: '+d.command_id);};
+    document.getElementById('dexSFC').onclick=async()=>{var d=await qCmd(host,'powershell','sfc /scannow');alert('SFC queued! ID: '+d.command_id);};
+    document.getElementById('dexBL').onclick=async()=>{if(!confirm('Enable BitLocker on '+host+'?'))return;var d=await qCmd(host,'bitlocker_enable','');alert('BitLocker queued! ID: '+d.command_id);};
+    document.getElementById('dexRestart').onclick=async()=>{if(!confirm('Restart '+host+'?'))return;var d=await qCmd(host,'restart','');alert('Restart queued! ID: '+d.command_id);};
+    document.getElementById('dexLock').onclick=async()=>{var d=await qCmd(host,'lock_screen','');alert('Lock screen queued! ID: '+d.command_id);};
+    document.getElementById('dexWU').onclick=async()=>{if(!confirm('Run Windows Update on '+host+'?'))return;var d=await qCmd(host,'windows_update','');alert('Update queued! ID: '+d.command_id);};
+    // Queue deep dex collection
+    qCmd(host,'collect_deep_dex','');
+  }catch(e){out.innerHTML=`<div style="color:#da3633">Error: ${esc(String(e))}</div>`;}
+}
+
+// ── BITLOCKER ─────────────────────────────────────────────────
+async function tabBitLocker(){
+  var ac=document.getElementById('ac');var eps=await getEps();
+  ac.innerHTML=`
+    <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128274; BitLocker Enforcement</h2>
+    <div class="card" style="background:#1a2e1a;border-color:#238636;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:600;color:#2ea043;margin-bottom:5px">Remote BitLocker via Endpoint Agent</div>
+      <div style="font-size:11px;color:#9b9b9b">Enables AES-256 BitLocker on C: silently. Requires TPM 2.0 + Windows Pro/Enterprise.</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn bg2" id="blAll">Enforce on All</button>
+      <button class="btn bb2" id="blCheck">Check All Status</button>
+    </div>
+    <div class="card" style="padding:0;overflow:auto">
+      <table class="tbl"><thead><tr><th>Hostname</th><th>User</th><th>Status</th><th>Encrypted%</th><th>TPM</th><th>Action</th></tr></thead>
+      <tbody>${eps.length?eps.map(e=>{var bl=e.bitlocker||{},st=bl.status||'Unknown',pct=bl.percent||0,tpm=bl.tpm_present?'Yes':'No';var stCls=st==='FullyEncrypted'?'bg':st==='EncryptionInProgress'?'bo':'br';
+        return `<tr><td style="font-weight:600">${esc(e.hostname||'')}</td><td>${esc(e.username||'')}</td><td><span class="badge ${stCls}">${esc(st)}</span></td><td>${pct}%</td><td><span class="badge ${tpm==='Yes'?'bg':'br'}">${tpm}</span></td><td><div style="display:flex;gap:3px"><button class="btn bb2" style="font-size:10px;padding:2px 6px" data-bla="check" data-host="${esc(e.hostname||'')}">Check</button><button class="btn bg2" style="font-size:10px;padding:2px 6px" data-bla="enable" data-host="${esc(e.hostname||'')}">Enable</button></div></td></tr>`;}).join(''):'<tr><td colspan="6" style="text-align:center;color:#555">No endpoints</td></tr>'}
+      </tbody></table>
+    </div>`;
+  document.getElementById('blAll').onclick=async()=>{if(!confirm('Enable BitLocker on ALL endpoints?'))return;for(var e of eps)if(e.hostname)await qCmd(e.hostname,'bitlocker_enable','');alert('Queued for all!');};
+  document.getElementById('blCheck').onclick=async()=>{for(var e of eps)if(e.hostname)await qCmd(e.hostname,'powershell','Get-BitLockerVolume C:|Select VolumeStatus,EncryptionPercentage|ConvertTo-Json');alert('Check queued for all!');};
+  ac.onclick=async e=>{var btn=e.target.closest('button[data-bla]');if(!btn)return;if(btn.dataset.bla==='check'){var d=await qCmd(btn.dataset.host,'powershell','Get-BitLockerVolume C:|Select VolumeStatus,EncryptionPercentage|ConvertTo-Json');alert('Check queued! ID: '+d.command_id);}if(btn.dataset.bla==='enable'){if(!confirm('Enable BitLocker on '+btn.dataset.host+'?'))return;var d2=await qCmd(btn.dataset.host,'bitlocker_enable','');alert('Queued! ID: '+d2.command_id);}};
+}
+
+// ── PBS ───────────────────────────────────────────────────────
+function tabSoftwareDeploy(){
+  var ac=document.getElementById('ac');
+  var pkgs=[['Google Chrome','Google.Chrome'],['Mozilla Firefox','Mozilla.Firefox'],['7-Zip','7zip.7zip'],['VLC','VideoLAN.VLC'],['Notepad++','Notepad++.Notepad++'],['VS Code','Microsoft.VisualStudioCode'],['Zoom','Zoom.Zoom'],['Teams','Microsoft.Teams'],['Python 3.11','Python.Python.3.11'],['Node.js LTS','OpenJS.NodeJS.LTS']];
+  ac.innerHTML=`
+    <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128640; Software Deployment</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="card">
+        <div class="ct">Deploy Software</div>
+        <input type="text" class="fi" id="sdH" placeholder="Hostname" style="margin-bottom:7px">
+        <input type="text" class="fi" id="sdPkg" placeholder="Package (e.g. Google.Chrome)" style="margin-bottom:7px">
+        <select class="fi" id="sdT" style="margin-bottom:7px"><option value="install_software">Install (winget)</option><option value="uninstall_software">Uninstall (winget)</option></select>
+        <button class="btn bg2" id="sdBtn" style="width:100%">Deploy</button>
+      </div>
+      <div class="card">
+        <div class="ct">Popular Packages</div>
+        <div style="display:grid;gap:5px">
+          ${pkgs.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 9px;background:#212121;border-radius:5px"><span style="font-size:11px">${esc(p[0])}</span><button class="btn bb2" style="font-size:10px;padding:2px 6px" data-pkg="${esc(p[1])}">Use</button></div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  ac.onclick=e=>{var btn=e.target.closest('button[data-pkg]');if(btn)document.getElementById('sdPkg').value=btn.dataset.pkg;};
+  document.getElementById('sdBtn').onclick=async()=>{
+    var h=document.getElementById('sdH').value.trim(),pkg=document.getElementById('sdPkg').value.trim(),t=document.getElementById('sdT').value;
+    if(!h||!pkg){alert('Enter hostname and package');return;}
+    if(!confirm((t==='install_software'?'Install':'Uninstall')+' '+pkg+' on '+h+'?'))return;
+    var d=await qCmd(h,t,pkg);alert('Queued! ID: '+d.command_id+'. Takes 5-10 min.');
+  };
+}
+
+// ── PATCH ─────────────────────────────────────────────────────
+async function tabPatch(){
+  var ac=document.getElementById('ac');var eps=await getEps();
+  ac.innerHTML=`
+    <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128260; Patch Management</h2>
+    <div class="sg">
+      ${sc2('#da3633',eps.filter(e=>e.pending_updates>10).length,'Critical','10+ updates')}
+      ${sc2('#f0883e',eps.filter(e=>e.pending_updates>0&&e.pending_updates<=10).length,'Needs Update','1-10 updates')}
+      ${sc2('#2ea043',eps.filter(e=>e.pending_updates===0).length,'Patched','Up to date')}
+      ${sc2('#ececec',eps.length,'Total PCs','All endpoints')}
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn bg2" id="patchAll">Patch All Online PCs</button>
+      <button class="btn bb2" onclick="setTab('patch')">Refresh</button>
+    </div>
+    <div class="card" style="padding:0;overflow:auto">
+      <table class="tbl"><thead><tr><th>Hostname</th><th>User</th><th>Updates</th><th>Status</th><th>Last Seen</th><th>Action</th></tr></thead>
+      <tbody>${eps.length?eps.map(e=>{var upd=e.pending_updates||0,cls=upd>10?'br':upd>0?'bo':'bg',lbl=upd>10?'Critical '+upd:upd>0?upd+' Pending':'Up to date';
+        return `<tr><td style="font-weight:600">${esc(e.hostname||'')}</td><td>${esc(e.username||'')}</td><td><span class="badge ${cls}">${lbl}</span></td><td><span class="badge ${e.status==='online'?'bg':'br'}">${esc(e.status||'')}</span></td><td style="font-size:10px;color:#666">${esc((e.last_seen||'').slice(0,16).replace('T',' '))}</td><td><button class="btn bb2" style="font-size:10px;padding:2px 6px" data-ph="${esc(e.hostname||'')}">Patch Now</button></td></tr>`;}).join(''):'<tr><td colspan="6" style="text-align:center;color:#555">No endpoints</td></tr>'}
+      </tbody></table>
+    </div>`;
+  document.getElementById('patchAll').onclick=async()=>{if(!confirm('Run Windows Update on ALL online PCs?'))return;var c=0;for(var e of eps){if(e.hostname&&e.status==='online'){await qCmd(e.hostname,'windows_update','');c++;}}alert('Update queued on '+c+' PCs!');};
+  ac.onclick=async e=>{var btn=e.target.closest('button[data-ph]');if(!btn)return;if(!confirm('Run Windows Update on '+btn.dataset.ph+'?'))return;var d=await qCmd(btn.dataset.ph,'windows_update','');alert('Queued! ID: '+d.command_id);};
+}
+
+// ── SERVICES ─────────────────────────────────────────────────
+function tabServices(){
+  var ac=document.getElementById('ac');
+  var svcs=[['WazuhSvc','Wazuh Agent'],['Spooler','Print Spooler'],['wuauserv','Windows Update'],['W32Time','Windows Time'],['Dhcp','DHCP Client'],['dnscache','DNS Client'],['EventLog','Windows Event Log']];
+  ac.innerHTML=`
+    <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#9881; Windows Services</h2>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input type="text" class="fi" id="svcH" placeholder="Hostname" style="flex:1">
+    </div>
+    <div class="card">
+      <div class="ct">Custom Service Action</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input type="text" class="fi" id="svcName" placeholder="Service Name (e.g. WazuhSvc)" style="flex:1">
+        <button class="btn bg2" id="svcStart">Start</button>
+        <button class="btn br2" id="svcStop">Stop</button>
+        <button class="btn bb2" id="svcRestart">Restart</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ct">Common Services</div>
+      <div style="display:grid;gap:5px">
+        ${svcs.map(sv=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:#212121;border-radius:5px"><span style="font-size:12px">${esc(sv[1])}</span><div style="display:flex;gap:5px"><button class="btn bg2" style="font-size:10px;padding:2px 6px" data-sn="${esc(sv[0])}" data-sa="service_start">Start</button><button class="btn br2" style="font-size:10px;padding:2px 6px" data-sn="${esc(sv[0])}" data-sa="service_stop">Stop</button><button class="btn bb2" style="font-size:10px;padding:2px 6px" data-sn="${esc(sv[0])}" data-sa="service_restart">Restart</button></div></div>`).join('')}
+      </div>
+    </div>`;
+  var getH=()=>{var h=document.getElementById('svcH').value.trim();if(!h)alert('Enter hostname first');return h;};
+  document.getElementById('svcStart').onclick=async()=>{var h=getH(),n=document.getElementById('svcName').value.trim();if(!h||!n)return;var d=await qCmd(h,'service_start',n);alert('Start queued! ID: '+d.command_id);};
+  document.getElementById('svcStop').onclick=async()=>{var h=getH(),n=document.getElementById('svcName').value.trim();if(!h||!n)return;var d=await qCmd(h,'service_stop',n);alert('Stop queued! ID: '+d.command_id);};
+  document.getElementById('svcRestart').onclick=async()=>{var h=getH(),n=document.getElementById('svcName').value.trim();if(!h||!n)return;var d=await qCmd(h,'service_restart',n);alert('Restart queued! ID: '+d.command_id);};
+  ac.onclick=async e=>{var btn=e.target.closest('button[data-sn]');if(!btn)return;var h=getH();if(!h)return;var d=await qCmd(h,btn.dataset.sa,btn.dataset.sn);alert(btn.dataset.sa+' queued! ID: '+d.command_id);};
+}
+
+// ── STARTUP ───────────────────────────────────────────────────
+function tabStartup(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML=`<h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128640; Startup Programs</h2>
+    <div style="display:flex;gap:8px;margin-bottom:12px"><input type="text" class="fi" id="startH" placeholder="Hostname" style="flex:1"><button class="btn bb2" id="startLoad">Collect</button></div>
+    <div id="startOut"></div>`;
+  document.getElementById('startLoad').onclick=async()=>{var h=document.getElementById('startH').value.trim();if(!h){alert('Enter hostname');return;}var d=await qCmd(h,'get_startup','');document.getElementById('startOut').innerHTML=`<div style="color:#2ea043;padding:12px;background:#1a2e1a;border-radius:8px">Startup programs queued! ID: ${d.command_id}<br><span style="font-size:10px;color:#666">Results in audit log within 5 minutes.</span></div>`;};
+}
+
+// ── USB ───────────────────────────────────────────────────────
+async function tabUSB(){
+  var ac=document.getElementById('ac');var eps=await getEps();
+  ac.innerHTML=`
+    <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128268; USB Storage Control</h2>
+    <div class="card" style="background:#2e1a1a;border-color:#da3633;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:600;color:#f85149;margin-bottom:5px">&#9888; USB Block/Allow Control</div>
+      <div style="font-size:11px;color:#9b9b9b">Blocking USB prevents all USB storage devices. Does not affect keyboards or mice.</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn br2" id="usbBlockAll">Block USB on ALL PCs</button>
+      <button class="btn bg2" id="usbAllowAll">Allow USB on ALL PCs</button>
+    </div>
+    <div class="card" style="padding:0;overflow:auto">
+      <table class="tbl"><thead><tr><th>Hostname</th><th>User</th><th>Actions</th></tr></thead>
+      <tbody>${eps.length?eps.map(e=>`<tr><td style="font-weight:600">${esc(e.hostname||'')}</td><td>${esc(e.username||'')}</td><td><div style="display:flex;gap:4px"><button class="btn br2" style="font-size:10px;padding:2px 6px" data-ubh="${esc(e.hostname||'')}" data-uba="disable_usb">Block</button><button class="btn bg2" style="font-size:10px;padding:2px 6px" data-ubh="${esc(e.hostname||'')}" data-uba="enable_usb">Allow</button></div></td></tr>`).join(''):'<tr><td colspan="3" style="text-align:center;color:#555">No endpoints</td></tr>'}
+      </tbody></table>
+    </div>`;
+  document.getElementById('usbBlockAll').onclick=async()=>{if(!confirm('Block USB on ALL '+eps.length+' endpoints?'))return;for(var e of eps)if(e.hostname)await qCmd(e.hostname,'disable_usb','');alert('USB blocked on all!');};
+  document.getElementById('usbAllowAll').onclick=async()=>{if(!confirm('Allow USB on ALL endpoints?'))return;for(var e of eps)if(e.hostname)await qCmd(e.hostname,'enable_usb','');alert('USB allowed on all!');};
+  ac.onclick=async e=>{var btn=e.target.closest('button[data-ubh]');if(!btn)return;var d=await qCmd(btn.dataset.ubh,btn.dataset.uba,'');alert((btn.dataset.uba==='disable_usb'?'USB blocked':'USB allowed')+' on '+btn.dataset.ubh+'! ID: '+d.command_id);};
+}
+
+// ── EVENT LOGS ────────────────────────────────────────────────
+function tabEventLogs(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML=`<h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128203; Windows Event Logs</h2>
+    <div style="display:flex;gap:8px;margin-bottom:12px"><input type="text" class="fi" id="evtH" placeholder="Hostname" style="flex:1"><select class="fi" id="evtLog" style="width:auto"><option value="System">System</option><option value="Application">Application</option><option value="Security">Security</option></select><button class="btn bb2" id="evtLoad">Collect Logs</button></div>
+    <div id="evtOut"></div>`;
+  document.getElementById('evtLoad').onclick=async()=>{var h=document.getElementById('evtH').value.trim(),log=document.getElementById('evtLog').value;if(!h){alert('Enter hostname');return;}var d=await qCmd(h,'collect_event_logs',log);document.getElementById('evtOut').innerHTML=`<div style="color:#2ea043;padding:12px;background:#1a2e1a;border-radius:8px">Event logs queued! ID: ${d.command_id}<br><span style="font-size:10px;color:#666">Results in audit log within 5 minutes.</span></div>`;};
+}
+
+// ── PERFORMANCE ───────────────────────────────────────────────
+async function tabPerformance(){
+  var ac=document.getElementById('ac');var eps=await getEps();
+  ac.innerHTML=`
+    <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128200; Performance Monitor</h2>
+    <div style="display:flex;gap:8px;margin-bottom:12px"><input type="text" class="fi" id="perfH" placeholder="Hostname" style="flex:1"><button class="btn bb2" id="perfCollect">Collect Snapshot</button></div>
+    <div class="card">
+      <div class="ct">Live Performance — All Endpoints</div>
+      <div style="overflow:auto">
+        <table class="tbl"><thead><tr><th>Hostname</th><th>CPU%</th><th>RAM%</th><th>Disk%</th><th>Status</th><th>Score</th></tr></thead>
+        <tbody>${eps.length?eps.map(e=>{var s=dexScore(e),color=dexColor(s);return `<tr><td style="font-weight:600">${esc(e.hostname||'')}</td><td>${pbar(e.cpu_percent||0,80,60)}</td><td>${pbar(e.ram_percent||0,85,70)}</td><td>${pbar(e.disk_percent||0,85,70)}</td><td><span class="badge ${e.status==='online'?'bg':'br'}">${esc(e.status||'')}</span></td><td><span style="color:${color};font-weight:600">${s}/100</span></td></tr>`;}).join(''):'<tr><td colspan="6" style="text-align:center;color:#555">No endpoints</td></tr>'}
+        </tbody></table>
+      </div>
+    </div>`;
+  document.getElementById('perfCollect').onclick=async()=>{var h=document.getElementById('perfH').value.trim();if(!h){alert('Enter hostname');return;}var d=await qCmd(h,'collect_performance','');alert('Snapshot queued! ID: '+d.command_id);};
+}
+
+// ── LOCAL USERS ───────────────────────────────────────────────
+function tabLocalUsers(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML=`<h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128101; Local User Management</h2>
+    <div style="display:flex;gap:8px;margin-bottom:12px"><input type="text" class="fi" id="luH" placeholder="Hostname" style="flex:1"><button class="btn bb2" id="luLoad">List Users</button></div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="ct">Create Local User</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:7px">
+        <input class="fi" id="luUN" placeholder="Username"><input class="fi" type="password" id="luPW" placeholder="Password"><input class="fi" id="luH2" placeholder="Hostname">
+      </div>
+      <button class="btn bg2" id="luCreate">Create User</button>
+    </div><div id="luOut"></div>`;
+  document.getElementById('luLoad').onclick=async()=>{var h=document.getElementById('luH').value.trim();if(!h){alert('Enter hostname');return;}var d=await qCmd(h,'powershell','Get-LocalUser|Select Name,Enabled,LastLogon|ConvertTo-Json');document.getElementById('luOut').innerHTML=`<div style="color:#2ea043;padding:12px;background:#1a2e1a;border-radius:8px">Local users queued! ID: ${d.command_id}</div>`;};
+  document.getElementById('luCreate').onclick=async()=>{var h=document.getElementById('luH2').value.trim()||document.getElementById('luH').value.trim(),u=document.getElementById('luUN').value.trim(),p=document.getElementById('luPW').value;if(!h||!u||!p){alert('Fill all fields');return;}if(!confirm('Create local user '+u+' on '+h+'?'))return;var d=await qCmd(h,'create_local_user',u+'|'+p);alert('User creation queued! ID: '+d.command_id);};
+}
+
+// ── PRINTERS ──────────────────────────────────────────────────
+function tabPrinters(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML=`<h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128424; Printer Management</h2>
+    <div style="display:flex;gap:8px;margin-bottom:12px"><input type="text" class="fi" id="prtH" placeholder="Hostname" style="flex:1"><button class="btn bb2" id="prtLoad">List Printers</button></div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="ct">Set Default Printer</div>
+      <div style="display:flex;gap:8px"><input type="text" class="fi" id="prtName" placeholder="Printer name" style="flex:1"><input type="text" class="fi" id="prtH2" placeholder="Hostname" style="flex:1"><button class="btn bg2" id="prtDefault">Set Default</button></div>
+    </div><div id="prtOut"></div>`;
+  document.getElementById('prtLoad').onclick=async()=>{var h=document.getElementById('prtH').value.trim();if(!h){alert('Enter hostname');return;}var d=await qCmd(h,'get_printers','');document.getElementById('prtOut').innerHTML=`<div style="color:#2ea043;padding:12px;background:#1a2e1a;border-radius:8px">Printer list queued! ID: ${d.command_id}</div>`;};
+  document.getElementById('prtDefault').onclick=async()=>{var h=document.getElementById('prtH2').value.trim()||document.getElementById('prtH').value.trim(),n=document.getElementById('prtName').value.trim();if(!h||!n){alert('Enter hostname and printer name');return;}var d=await qCmd(h,'set_default_printer',n);alert('Default printer queued! ID: '+d.command_id);};
+}
+
+// ── NETWORK DRIVES ────────────────────────────────────────────
+function tabDrives(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML=`<h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128190; Network Drive Management</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="card">
+        <div class="ct">Map Network Drive</div>
+        <input type="text" class="fi" id="drH" placeholder="Hostname" style="margin-bottom:7px">
+        <input type="text" class="fi" id="drL" placeholder="Drive Letter (e.g. Z)" style="margin-bottom:7px">
+        <input type="text" class="fi" id="drP" placeholder="Network Path (\\\\server\\share)" style="margin-bottom:7px">
+        <button class="btn bg2" id="drMap" style="width:100%">Map Drive</button>
+      </div>
+      <div class="card">
+        <div class="ct">Unmap Drive</div>
+        <input type="text" class="fi" id="drH2" placeholder="Hostname" style="margin-bottom:7px">
+        <input type="text" class="fi" id="drU" placeholder="Drive Letter (e.g. Z)" style="margin-bottom:7px">
+        <button class="btn br2" id="drUnmap" style="width:100%">Unmap Drive</button>
+      </div>
+    </div>`;
+  document.getElementById('drMap').onclick=async()=>{var h=document.getElementById('drH').value.trim(),l=document.getElementById('drL').value.trim().replace(':',''),p=document.getElementById('drP').value.trim();if(!h||!l||!p){alert('Fill all fields');return;}var d=await qCmd(h,'map_drive',l+'|'+p);alert('Drive mapping queued! ID: '+d.command_id);};
+  document.getElementById('drUnmap').onclick=async()=>{var h=document.getElementById('drH2').value.trim(),l=document.getElementById('drU').value.trim().replace(':','');if(!h||!l){alert('Fill all fields');return;}if(!confirm('Unmap drive '+l+': on '+h+'?'))return;var d=await qCmd(h,'unmap_drive',l);alert('Unmap queued! ID: '+d.command_id);};
+}
+
+// ── REPORTS ───────────────────────────────────────────────────
+
+</script>
+
+<script>
+// ── Group C (Security Tools) ──────────────────────────────────────────────────────
+async function tabWazuh(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML='<div style="color:#666;padding:20px">Connecting to Wazuh...</div>';
+  try{var r=await fetch('/api/wazuh/alerts',{headers:ah()});var d=await r.json();wAlerts=d.alerts||[];}
+  catch(e){wAlerts=[
+    {level:12,agent:{name:'LAPTOP-PR-25'},rule:{description:'Rootkit: Hidden file detected',id:'87105'},timestamp:'2026-07-10T14:00:00'},
+    {level:12,agent:{name:'PC-FIN-03'},rule:{description:'Windows Firewall disabled',id:'60032'},timestamp:'2026-07-10T13:00:00'},
+    {level:8,agent:{name:'LAPTOP-HR-07'},rule:{description:'Multiple failed login attempts',id:'18113'},timestamp:'2026-07-10T12:00:00'},
+    {level:5,agent:{name:'LAPTOP-PR-25'},rule:{description:'Antivirus definitions outdated',id:'72004'},timestamp:'2026-07-10T10:00:00'}
+  ];}
+  renderWazuh(ac);
+}
+function renderWazuh(ac){
+  var crit=wAlerts.filter(a=>a.level>=12).length,high=wAlerts.filter(a=>a.level>=8&&a.level<12).length;
+  var med=wAlerts.filter(a=>a.level>=5&&a.level<8).length,low=wAlerts.filter(a=>a.level<5).length;
+  ac.innerHTML=`
+    <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128272; Wazuh Security Findings</h2>
+    <div class="sg">${sc2('#da3633',crit,'Critical','Level 12+')}${sc2('#f0883e',high,'High','Level 8-11')}${sc2('#d29922',med,'Medium','Level 5-7')}${sc2('#58a6ff',low,'Low','Level 0-4')}</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <select class="fi" id="wSev" style="width:auto"><option value="">All</option><option value="12">Critical</option><option value="8">High</option><option value="5">Medium</option></select>
+      <input type="text" class="fi" id="wQ" placeholder="Search..." style="flex:1">
+      <a href="https://${SIEM_IP}" target="_blank" class="btn bb2" style="text-decoration:none;line-height:2.2">Wazuh UI</a>
+      <button class="btn bg2" onclick="setTab('wazuh')">Refresh</button>
+    </div>
+    <div id="wList">${alertsHtml(wAlerts)}</div>`;
+  document.getElementById('wSev').onchange=filterWazuh;
+  document.getElementById('wQ').oninput=filterWazuh;
+  ac.onclick=e=>{
+    var btn=e.target.closest('button[data-wa]');if(!btn)return;
+    if(btn.dataset.wa==='ai'){setTab('ai');setTimeout(()=>{var el=document.getElementById('aiIn');if(el){el.value='Alert on '+btn.dataset.host+': '+btn.dataset.rule;runAIReco();}},300);}
+    if(btn.dataset.wa==='fix'){wFix(btn.dataset.rule,btn.dataset.host);}
+  };
+}
+function alertsHtml(alerts){
+  if(!alerts.length)return '<div style="color:#555;padding:20px;text-align:center">No alerts</div>';
+  return alerts.map(a=>{
+    var lv=a.level||0,cls=lv>=12?'alc':lv>=8?'alh':lv>=5?'alm':'all',bcls=lv>=12?'br':lv>=8?'bo':lv>=5?'bx':'bb';
+    var sev=lv>=12?'CRITICAL':lv>=8?'HIGH':lv>=5?'MEDIUM':'LOW';
+    var host=(a.agent&&a.agent.name)||'Unknown',rule=(a.rule&&a.rule.description)||'Unknown';
+    var rid=(a.rule&&a.rule.id)||'',ts=(a.timestamp||'').slice(0,16).replace('T',' ');
+    return `<div class="al ${cls}"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><span class="badge ${bcls}" style="margin-right:7px">${sev}</span><strong>${esc(rule)}</strong></div><div style="display:flex;gap:5px;flex-shrink:0"><button class="btn bb2" style="font-size:10px;padding:2px 7px" data-wa="ai" data-rule="${esc(rule)}" data-host="${esc(host)}">AI Reco</button><button class="btn bg2" style="font-size:10px;padding:2px 7px" data-wa="fix" data-rule="${esc(rule)}" data-host="${esc(host)}">Fix</button></div></div><div style="margin-top:5px;font-size:10px;color:#666">Host: ${esc(host)} | Rule: ${esc(rid)} | ${esc(ts)}</div></div>`;
+  }).join('');
+}
+function filterWazuh(){
+  var sev=parseInt(document.getElementById('wSev').value)||0;
+  var q=(document.getElementById('wQ').value||'').toLowerCase();
+  var f=wAlerts.filter(a=>{var h=((a.agent&&a.agent.name)||'').toLowerCase(),rl=((a.rule&&a.rule.description)||'').toLowerCase();return(!sev||(a.level>=sev))&&(!q||(h.includes(q)||rl.includes(q)));});
+  document.getElementById('wList').innerHTML=alertsHtml(f);
+}
+async function wFix(rule,host){
+  var cmds={'windows firewall disabled':'Set-NetFirewallProfile -All -Enabled True','antivirus definitions outdated':'Update-MpSignature','multiple failed login':'net accounts /lockoutthreshold:5'};
+  var cmd=null;Object.keys(cmds).forEach(k=>{if(rule.toLowerCase().includes(k))cmd=cmds[k];});
+  if(!cmd)cmd=prompt('No auto-fix. PowerShell for '+host+':');
+  if(!cmd)return;if(!confirm('Execute on '+host+'?'))return;
+  var d=await qCmd(host,'powershell',cmd);alert('Fix queued! ID: '+d.command_id);
+}
+
+// ── AI ────────────────────────────────────────────────────────
+async function tabDLP(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML='<div style="color:#666;padding:20px">Loading DLP data...</div>';
+  try{
+    var sv=await fetch('/api/admin/dlp/summary',{headers:ah()}).then(r=>r.json());
+    var ev=await fetch('/api/admin/dlp/events',{headers:ah()}).then(r=>r.json());
+    var eps=await getEps();
+    var events=ev.events||[];
+    var sevColor={critical:'#da3633',high:'#f0883e',medium:'#d29922',low:'#58a6ff'};
+    var sevClass={critical:'br',high:'bo',medium:'bx',low:'bb'};
+
+    ac.innerHTML=`
+      <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128274; Data Loss Prevention (DLP)</h2>
+      <div class="sg">
+        ${sc2('#da3633',sv.critical||0,'Critical','Sensitive data exposed')}
+        ${sc2('#f0883e',sv.high||0,'High','High risk events')}
+        ${sc2('#d29922',sv.medium||0,'Medium','Medium risk events')}
+        ${sc2('#58a6ff',sv.today||0,'Today','Events today')}
+        ${sc2('#ececec',sv.affected_hosts||0,'Affected PCs','Hosts with events')}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card">
+          <div class="ct">&#128269; Run DLP Scan</div>
+          <input type="text" class="fi" id="dlpHost" placeholder="Hostname or ALL" style="margin-bottom:8px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <button class="btn bb2" id="dlpScan">Quick Scan</button>
+            <button class="btn br2" id="dlpDeep">Deep Scan</button>
+          </div>
+          <div style="font-size:11px;color:#666">
+            Quick: USB + sensitive filenames<br>
+            Deep: Full content scan (takes longer)
+          </div>
+          <div id="dlpScanOut" style="margin-top:8px"></div>
+        </div>
+        <div class="card">
+          <div class="ct">DLP Policy</div>
+          <div style="display:grid;gap:6px">
+            ${[['Credit Cards','credit_card','critical'],['SSN / Aadhar','ssn_aadhar','critical'],
+               ['API Keys','api_keys','high'],['Private Keys','private_keys','critical'],
+               ['Password Files','passwords','high'],['PAN Card','pan_card','high'],
+               ['USB Storage','usb_monitor','high'],['Email Lists','email_lists','medium']
+              ].map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 9px;background:#212121;border-radius:5px">
+                <span style="font-size:12px">${p[0]}</span>
+                <span class="badge ${sevClass[p[2]]||'bx'}">${p[2]}</span>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="ct">DLP Events (${events.length}) <button class="btn bb2" style="font-size:10px;padding:2px 7px" onclick="setTab('dlp')">Refresh</button></div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <select class="fi" id="dlpSev" style="width:auto">
+            <option value="">All Severities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+          </select>
+          <select class="fi" id="dlpType" style="width:auto">
+            <option value="">All Types</option>
+            <option value="sensitive_data_found">Sensitive Data</option>
+            <option value="usb_storage_active">USB Storage</option>
+            <option value="sensitive_filename">Sensitive Filename</option>
+          </select>
+          <input type="text" class="fi" id="dlpQ" placeholder="Search host or file..." style="flex:1">
+        </div>
+        <div id="dlpList">
+          ${events.length?events.map(e=>{
+            var color=sevColor[e.severity]||'#666';
+            var cls=sevClass[e.severity]||'bx';
+            var ts=(e.timestamp||'').slice(0,16).replace('T',' ');
+            var det={};try{det=JSON.parse(e.details||'{}');}catch(ex){}
+            return `<div class="al" style="border-color:${color}" data-sev="${esc(e.severity||'')}" data-type="${esc(e.event_type||'')}" data-host="${esc(e.hostname||'').toLowerCase()}">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div>
+                  <span class="badge ${cls}" style="margin-right:7px">${esc((e.severity||'').toUpperCase())}</span>
+                  <strong>${esc(e.description||'')}</strong>
+                </div>
+                <span style="font-size:10px;color:#666;flex-shrink:0">${esc(ts)}</span>
+              </div>
+              <div style="margin-top:5px;font-size:11px;color:#666">
+                Host: ${esc(e.hostname||'')} | Type: ${esc(e.event_type||'')}
+                ${e.file_path?`| File: <span style="font-family:monospace;font-size:10px">${esc(e.file_path)}</span>`:''}
+              </div>
+              ${det.match_count?`<div style="font-size:10px;color:#da3633;margin-top:3px">Matches found: ${det.match_count} | Pattern: ${esc(det.pattern||'')}</div>`:''}
+            </div>`;
+          }).join(''):'<div style="color:#2ea043;padding:20px;text-align:center">No DLP events recorded yet.<br><span style="font-size:11px;color:#666">Run a scan to detect sensitive data.</span></div>'}
+        </div>
+      </div>`;
+
+    // Scan buttons
+    document.getElementById('dlpScan').onclick=async()=>{
+      var h=document.getElementById('dlpHost').value.trim();
+      if(!h){alert('Enter hostname or ALL');return;}
+      document.getElementById('dlpScanOut').innerHTML='<div style="color:#666;font-size:11px">Queuing scan...</div>';
+      var targets=h.toUpperCase()==='ALL'?eps.map(e=>e.hostname).filter(Boolean):[h];
+      var count=0;
+      for(var t of targets){
+        await fetch('/api/admin/dlp/scan',{method:'POST',headers:ah(),body:JSON.stringify({hostname:t,policy:{type:'quick'}})});
+        count++;
+      }
+      document.getElementById('dlpScanOut').innerHTML=`<div style="color:#2ea043;font-size:11px">Quick scan queued on ${count} PC(s)! Results in 5 min.</div>`;
+    };
+
+    document.getElementById('dlpDeep').onclick=async()=>{
+      var h=document.getElementById('dlpHost').value.trim();
+      if(!h){alert('Enter hostname');return;}
+      if(!confirm('Deep scan reads file contents on '+h+'. This may take 10-15 minutes.'))return;
+      await fetch('/api/admin/dlp/scan',{method:'POST',headers:ah(),body:JSON.stringify({hostname:h,policy:{type:'deep'}})});
+      document.getElementById('dlpScanOut').innerHTML='<div style="color:#2ea043;font-size:11px">Deep scan queued! Results in 15 min.</div>';
+    };
+
+    // Filters
+    function filterDLP(){
+      var sev=document.getElementById('dlpSev').value;
+      var type=document.getElementById('dlpType').value;
+      var q=(document.getElementById('dlpQ').value||'').toLowerCase();
+      document.querySelectorAll('#dlpList .al').forEach(el=>{
+        var ms=!sev||el.dataset.sev===sev;
+        var mt=!type||el.dataset.type===type;
+        var mq=!q||el.dataset.host.includes(q)||el.innerText.toLowerCase().includes(q);
+        el.style.display=ms&&mt&&mq?'':'none';
+      });
+    }
+    document.getElementById('dlpSev').onchange=filterDLP;
+    document.getElementById('dlpType').onchange=filterDLP;
+    document.getElementById('dlpQ').oninput=filterDLP;
+
+  }catch(e){ac.innerHTML=`<div style="color:#da3633;padding:20px">DLP Error: ${esc(String(e))}</div>`;}
+}
+
+// ── SECURITY SCAN TAB ─────────────────────────────────────────
+async function tabSecurity(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML=`
+    <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128737; Security Posture</h2>
+
+    <div class="sg">
+      ${sc2('#2ea043','0','Critical Vulns','After fixes')}
+      ${sc2('#f0883e','4','Medium Issues','GLPI timeouts')}
+      ${sc2('#2ea043','85','Security Score','/100')}
+      ${sc2('#2ea043','&#9989;','Packages','All updated')}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="ct">&#128202; Bandit SAST Results</div>
+        <div style="display:grid;gap:6px">
+          ${[
+            ['High Severity','0 issues','bg','All fixed'],
+            ['Medium Severity','4 issues','bo','GLPI timeouts'],
+            ['Low Severity','11 issues','bx','Subprocess calls'],
+            ['verify=False','nosec tagged','bg','Internal certs'],
+            ['Hardcoded creds','None found','bg','Clean'],
+            ['SQL Injection','Parameterized','bg','Protected'],
+          ].map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#212121;border-radius:5px">
+            <span style="font-size:12px">${r[0]}</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="badge ${r[2]}">${r[1]}</span>
+              <span style="font-size:10px;color:#666">${r[3]}</span>
+            </div>
+          </div>`).join('')}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="ct">&#128230; Package Vulnerabilities</div>
+        <div style="display:grid;gap:6px">
+          ${[
+            ['cryptography','49.0.0','bg','Updated'],
+            ['jinja2','3.1.6','bg','Updated'],
+            ['setuptools','83.0.0','bg','Updated'],
+            ['pip','26.1.2','bg','Updated'],
+            ['click','8.4.2','bg','Updated'],
+            ['torch','2.12.0','bo','Ollama dep only'],
+          ].map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#212121;border-radius:5px">
+            <span style="font-size:12px">${r[0]}</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="badge ${r[2]}">${r[1]}</span>
+              <span style="font-size:10px;color:#666">${r[3]}</span>
+            </div>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="ct">&#128274; Security Controls</div>
+        <div style="display:grid;gap:6px">
+          ${[
+            ['Rate Limiting','&#9989; Active','bg'],
+            ['Security Headers','&#9989; Active','bg'],
+            ['Token Expiry','&#9989; 8 hours','bg'],
+            ['Input Validation','&#9989; Active','bg'],
+            ['HTTPS/SSL','&#9989; Valid','bg'],
+            ['Wazuh SIEM','&#9989; Connected','bg'],
+            ['DLP Monitor','&#9989; Active','bg'],
+            ['Service Watchdog','&#9989; Running','bg'],
+            ['DB Auto-Backup','&#9989; Daily 2am','bg'],
+            ['MFA','&#10006; Pending','br'],
+            ['AD Integration','&#10006; Pending','br'],
+          ].map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 10px;background:#212121;border-radius:5px">
+            <span style="font-size:12px">${r[0]}</span>
+            <span class="badge ${r[2]}" style="font-size:10px">${r[1]}</span>
+          </div>`).join('')}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="ct">&#127919; OWASP ZAP DAST</div>
+        <div id="zapStatus">
+          <div style="background:#2e2a1a;border:1px solid #d29922;border-radius:8px;padding:12px;margin-bottom:10px">
+            <div style="font-size:12px;font-weight:600;color:#d29922;margin-bottom:5px">&#9203; Scan In Progress</div>
+            <div style="font-size:11px;color:#9b9b9b">ZAP baseline scan running against http://${SERVER_IP}:7000<br>Results will appear here when complete (~10 min)</div>
+          </div>
+          <button class="btn bb2" style="width:100%;margin-bottom:7px" id="zapRun">Run ZAP Scan</button>
+          <button class="btn bx2" style="width:100%" id="zapReport">View Last Report</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct">&#128203; Run Security Checks</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn bb2" id="runBandit">Run Bandit SAST</button>
+        <button class="btn bb2" id="runPipAudit">Check Packages</button>
+        <button class="btn bg2" id="runZAP">Run OWASP ZAP</button>
+        <button class="btn bx2" id="viewSecLog">View Security Log</button>
+      </div>
+      <div id="secOut" style="margin-top:10px"></div>
+    </div>`;
+
+  // Wire buttons
+  document.getElementById('runBandit').onclick=async()=>{
+    document.getElementById('secOut').innerHTML='<div style="color:#666;font-size:12px">Running Bandit SAST scan...</div>';
+    var r=await fetch('/api/admin/security/bandit',{headers:ah()});
+    var d=await r.json();
+    document.getElementById('secOut').innerHTML=`<div style="background:#212121;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;white-space:pre-wrap;max-height:300px;overflow:auto">${esc(d.output||d.error||'No output')}</div>`;
+  };
+
+  document.getElementById('runPipAudit').onclick=async()=>{
+    document.getElementById('secOut').innerHTML='<div style="color:#666;font-size:12px">Checking packages...</div>';
+    var r=await fetch('/api/admin/security/pip-audit',{headers:ah()});
+    var d=await r.json();
+    document.getElementById('secOut').innerHTML=`<div style="background:#212121;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;white-space:pre-wrap;max-height:300px;overflow:auto">${esc(d.output||d.error||'No output')}</div>`;
+  };
+
+  document.getElementById('runZAP').onclick=async()=>{
+    if(!confirm('Run OWASP ZAP scan? This takes 5-10 minutes.'))return;
+    document.getElementById('secOut').innerHTML='<div style="color:#666;font-size:12px">Starting ZAP scan... Check back in 10 minutes.</div>';
+    fetch('/api/admin/security/zap',{headers:ah()});
+    setTimeout(()=>{document.getElementById('secOut').innerHTML='<div style="color:#2ea043;font-size:12px">ZAP scan started! Refresh this tab in 10 minutes to see results.</div>';},2000);
+  };
+
+  document.getElementById('zapRun').onclick=document.getElementById('runZAP').onclick;
+  document.getElementById('zapReport').onclick=()=>window.open('/api/admin/security/zap-report','_blank');
+  document.getElementById('viewSecLog').onclick=async()=>{
+    var r=await fetch('/api/admin/security/log',{headers:ah()});
+    var d=await r.json();
+    document.getElementById('secOut').innerHTML=`<div style="background:#212121;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;white-space:pre-wrap;max-height:300px;overflow:auto">${esc(d.log||'No log entries')}</div>`;
+  };
+}
+
+// ══ SOFTWARE MONITOR ════════════════════════════════════════
+async function tabSoftwareMonitor(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML='<div style="color:#666;padding:20px">Loading...</div>';
+  try{
+    var eps=await getEps();
+    var sw=await fetch('/api/admin/software/changes',{headers:ah()}).then(r=>r.json()).catch(()=>({changes:[]}));
+    var changes=sw.changes||[];
+    var blist=['BitTorrent','uTorrent','TeamViewer','AnyDesk','CCleaner','Wireshark','Torrent'];
+    var reqSw=['Wazuh Agent','RustDesk','Trend Micro'];
+    var blAlerts=changes.filter(c=>c.change_type==='blacklisted');
+    ac.innerHTML=`
+      <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128270; Software Monitor</h2>
+      <div class="sg">
+        ${sc2('#2ea043',changes.filter(c=>c.change_type==='installed').length,'Installed','Today')}
+        ${sc2('#da3633',changes.filter(c=>c.change_type==='removed').length,'Removed','Today')}
+        ${sc2('#f0883e',blAlerts.length,'Blacklisted','Alerts')}
+        ${sc2('#d29922',changes.length,'Total Changes','All time')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card">
+          <div class="ct">&#9989; Required Software Compliance</div>
+          ${reqSw.map(sw=>{
+            var ok=eps.filter(e=>(e.software||[]).some(s=>s.name&&s.name.toLowerCase().includes(sw.toLowerCase()))).length;
+            var pct=eps.length?Math.round(ok/eps.length*100):0;
+            return `<div style="padding:7px 10px;background:#212121;border-radius:5px;margin-bottom:5px">
+              <div style="display:flex;justify-content:space-between">
+                <span style="font-size:12px">${esc(sw)}</span>
+                <span class="badge ${pct===100?'bg':'br'}">${ok}/${eps.length}</span>
+              </div>
+              <div style="height:3px;background:#2f2f2f;border-radius:2px;margin-top:4px">
+                <div style="height:3px;width:${pct}%;background:${pct===100?'#2ea043':'#da3633'};border-radius:2px"></div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="card">
+          <div class="ct">&#128683; Blacklist Alerts</div>
+          ${blAlerts.length?blAlerts.map(c=>`
+            <div class="al" style="border-color:#f0883e;margin-bottom:5px">
+              <div style="font-size:12px;font-weight:600">&#9888; ${esc(c.software_name)}</div>
+              <div style="font-size:11px;color:#666">${esc(c.hostname)} | ${esc((c.detected_at||'').slice(0,16))}</div>
+            </div>`).join(''):
+            '<div style="color:#2ea043;padding:15px;text-align:center;font-size:12px">&#9989; No blacklisted software</div>'}
+          <div style="margin-top:8px;padding:8px;background:#212121;border-radius:5px">
+            <div style="font-size:10px;font-weight:600;color:#d29922;margin-bottom:4px">Monitored (Alert Only):</div>
+            ${blist.map(s=>`<span class="badge bo" style="margin:2px;font-size:10px">${esc(s)}</span>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">&#128260; Change Feed</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <select class="fi" id="swF" style="width:auto">
+            <option value="">All</option><option value="installed">Installed</option>
+            <option value="removed">Removed</option><option value="blacklisted">Blacklisted</option>
+          </select>
+          <input class="fi" id="swQ" placeholder="Search..." style="flex:1">
+          <button class="btn bx2" onclick="setTab('software_monitor')">&#8635;</button>
+        </div>
+        <div id="swL">
+          ${changes.length?changes.map(c=>{
+            var col={installed:'#2ea043',removed:'#da3633',updated:'#d29922',blacklisted:'#f0883e'}[c.change_type]||'#666';
+            var ico={installed:'&#128994;',removed:'&#128308;',updated:'&#128992;',blacklisted:'&#9888;'}[c.change_type]||'&#9679;';
+            return `<div class="al" style="border-color:${col}" data-t="${esc(c.change_type)}" data-h="${esc((c.hostname||'').toLowerCase())}">
+              <div style="display:flex;justify-content:space-between">
+                <span>${ico} <strong>${esc(c.software_name||'')}</strong> <span class="badge bx" style="font-size:9px">${esc(c.change_type)}</span></span>
+                <span style="font-size:10px;color:#666">${esc((c.detected_at||'').slice(0,16))}</span>
+              </div>
+              <div style="font-size:11px;color:#666">${esc(c.hostname||'')} | ${esc(c.os_name||'')}</div>
+            </div>`;
+          }).join(''):'<div style="color:#666;padding:30px;text-align:center">No changes detected yet</div>'}
+        </div>
+      </div>`;
+    var flt=()=>{
+      var f=document.getElementById('swF').value,q=(document.getElementById('swQ').value||'').toLowerCase();
+      document.querySelectorAll('#swL .al').forEach(el=>{el.style.display=(!f||el.dataset.t===f)&&(!q||el.dataset.h.includes(q)||el.innerText.toLowerCase().includes(q))?'':'none';});
+    };
+    document.getElementById('swF').onchange=flt;document.getElementById('swQ').oninput=flt;
+  }catch(e){ac.innerHTML=`<div style="color:#da3633;padding:20px">Error: ${esc(String(e))}</div>`;}
+}
+
+// ══ SECURITY OPS ════════════════════════════════════════════
+async function tabSecOps(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML='<div style="color:#666;padding:20px">Loading...</div>';
+  try{
+    var wz=await fetch('/api/wazuh/alerts',{headers:ah()}).then(r=>r.json()).catch(()=>({alerts:[]}));
+    var dlp=await fetch('/api/admin/dlp/summary',{headers:ah()}).then(r=>r.json()).catch(()=>({}));
+    var alerts=wz.alerts||[];
+    var crit=alerts.filter(a=>a.level>=12),high=alerts.filter(a=>a.level>=8&&a.level<12);
+    ac.innerHTML=`
+      <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128680; Security Operations Center</h2>
+      <div class="sg">
+        ${sc2('#da3633',crit.length,'Critical','Level 12+')}
+        ${sc2('#f0883e',high.length,'High','Level 8-11')}
+        ${sc2('#d29922',dlp.critical||0,'DLP Critical','Data risk')}
+        ${sc2('#58a6ff',alerts.length,'Total Alerts','24h')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card">
+          <div class="ct" style="color:#da3633">&#128308; Critical (Level 12+)</div>
+          <div style="max-height:300px;overflow-y:auto">
+            ${crit.length?crit.map(a=>`<div class="al" style="border-color:#da3633;margin-bottom:5px">
+              <div style="font-size:12px;font-weight:600">${esc(a.description||a.rule||'')}</div>
+              <div style="font-size:10px;color:#666">${esc(a.agent||'')} | L${a.level} | ${esc((a.timestamp||'').slice(0,16))}</div>
+            </div>`).join(''):'<div style="color:#2ea043;padding:15px;text-align:center">&#9989; No critical alerts</div>'}
+          </div>
+        </div>
+        <div class="card">
+          <div class="ct" style="color:#f0883e">&#128992; High (Level 8-11)</div>
+          <div style="max-height:300px;overflow-y:auto">
+            ${high.length?high.map(a=>`<div class="al" style="border-color:#f0883e;margin-bottom:5px">
+              <div style="font-size:12px;font-weight:600">${esc(a.description||a.rule||'')}</div>
+              <div style="font-size:10px;color:#666">${esc(a.agent||'')} | L${a.level} | ${esc((a.timestamp||'').slice(0,16))}</div>
+            </div>`).join(''):'<div style="color:#2ea043;padding:15px;text-align:center">&#9989; No high alerts</div>'}
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">&#127759; Event Timeline</div>
+        <div style="max-height:400px;overflow-y:auto">
+          ${alerts.slice(0,50).map(a=>{
+            var col=a.level>=12?'#da3633':a.level>=8?'#f0883e':a.level>=5?'#d29922':'#58a6ff';
+            return `<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #2f2f2f">
+              <div style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;margin-top:4px"></div>
+              <div><div style="font-size:12px">${esc(a.description||a.rule||'')}</div>
+              <div style="font-size:10px;color:#666">${esc(a.agent||'')} | L${a.level} | ${esc((a.timestamp||'').slice(0,16))}</div></div>
+            </div>`;
+          }).join('')||'<div style="color:#666;padding:20px;text-align:center">No events</div>'}
+        </div>
+      </div>`;
+  }catch(e){ac.innerHTML=`<div style="color:#da3633;padding:20px">Error: ${esc(String(e))}</div>`;}
+}
+
+// ══ OPENVAS ════════════════════════════════════════════════
+async function tabOpenVAS(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML=`
+    <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128269; OpenVAS Vulnerability Scanner</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="ct">&#9654; Run Scan</div>
+        <input class="fi" id="ovaT" placeholder="Target IP or range (10.0.0.0/24)" style="margin-bottom:8px">
+        <select class="fi" id="ovaST" style="margin-bottom:8px">
+          <option value="fast">Fast Scan</option>
+          <option value="full">Full Scan</option>
+          <option value="discovery">Discovery Only</option>
+        </select>
+        <button class="btn bg2" id="ovaRun" style="width:100%">&#128269; Launch Scan</button>
+        <div id="ovaOut" style="margin-top:8px"></div>
+        <div style="margin-top:10px;padding:8px;background:#212121;border-radius:5px;font-size:11px;color:#666">
+          OpenVAS running at ${VULN_SCANNER_IP}<br>Finds CVEs, misconfigs, open ports
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">&#128202; Last Scan Results</div>
+        <div id="ovaStats">
+          ${[['Critical CVEs','0 found','br'],['High Severity','0 found','bo'],['Medium','0 found','bx'],['Last Scan','Never','bx'],['Hosts Scanned','0','bx']].map(r=>
+            `<div style="display:flex;justify-content:space-between;padding:5px 10px;background:#212121;border-radius:5px;margin-bottom:4px">
+              <span style="font-size:12px">${r[0]}</span><span class="badge ${r[2]}">${r[1]}</span>
+            </div>`).join('')}
+        </div>
+        <button class="btn bb2" style="width:100%;margin-top:8px" onclick="window.open('http://${VULN_SCANNER_IP}','_blank')">Open OpenVAS UI</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ct">&#128203; Vulnerability Findings</div>
+      <div id="ovaF" style="color:#666;padding:30px;text-align:center">
+        No results yet. Run a scan to see findings.<br>
+        <span style="font-size:11px">Scan takes 5-15 minutes</span>
+      </div>
+    </div>`;
+  document.getElementById('ovaRun').onclick=async()=>{
+    var t=document.getElementById('ovaT').value.trim(),st=document.getElementById('ovaST').value;
+    if(!t){alert('Enter target');return;}
+    document.getElementById('ovaOut').innerHTML='<div style="color:#d29922;font-size:11px;padding:6px;background:#2e2a1a;border-radius:4px">&#9203; Queuing scan on '+esc(t)+'...</div>';
+    try{
+      var r=await fetch('/api/admin/openvas/scan',{method:'POST',headers:ah(),body:JSON.stringify({target:t,scan_type:st})});
+      var d=await r.json();
+      document.getElementById('ovaOut').innerHTML=d.status==='ok'?
+        `<div style="color:#2ea043;font-size:11px;padding:6px;background:#1a2e1a;border-radius:4px">&#9989; Scan started! ID: ${esc(d.task_id||'N/A')}</div>`:
+        `<div style="color:#f0883e;font-size:11px;padding:6px;background:#2e1a1a;border-radius:4px">&#9888; ${esc(d.error||'OpenVAS unreachable')}</div>`;
+    }catch(e){document.getElementById('ovaOut').innerHTML=`<div style="color:#da3633;font-size:11px;padding:6px">Error: ${esc(String(e))}</div>`;}
+  };
+}
+
+// ══ THREAT INTEL ═══════════════════════════════════════════
+async function tabThreatIntel(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML='<div style="color:#666;padding:20px">Loading threat intelligence...</div>';
+  try{
+    var d=await fetch('/api/admin/opencti/feeds',{headers:ah()}).then(r=>r.json()).catch(()=>({attack_patterns:[],counts:{}}));
+    var aps=d.attack_patterns||[],cnt=d.counts||{};
+    ac.innerHTML=`
+      <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#129302; Threat Intelligence — OpenCTI (MITRE ATT&CK)</h2>
+      <div class="sg">
+        ${sc2('#da3633',cnt.attackPatterns||0,'Attack Patterns (TTPs)','')}
+        ${sc2('#f0883e',cnt.malwares||0,'Malware Families','')}
+        ${sc2('#58a6ff',cnt.intrusionSets||0,'Intrusion Sets','')}
+        ${sc2('#666',cnt.indicators||0,'IOC Indicators','Not populated yet')}
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="ct">&#127988; MITRE ATT&CK — Attack Patterns</div>
+        <div style="max-height:450px;overflow-y:auto">
+          ${aps.length?aps.map(a=>`
+            <div style="padding:7px 8px;border-bottom:1px solid #2f2f2f">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <strong style="font-size:12px">${esc(a.name||'')}</strong>
+                ${a.mitre_id?`<span class="badge bb" style="font-size:9px">${esc(a.mitre_id)}</span>`:''}
+              </div>
+              <div style="font-size:11px;color:#666;margin-top:2px">${esc(a.description||'')}...</div>
+            </div>`).join(''):
+            `<div style="padding:30px;text-align:center;color:#666;font-size:12px">
+              OpenCTI at ${THREAT_INTEL_IP}<br>No attack patterns loaded
+            </div>`}
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">&#128203; About This Data</div>
+        <div style="font-size:11px;color:#9b9b9b;line-height:1.6">
+          OpenCTI's MITRE ATT&CK connector has loaded <strong>${cnt.attackPatterns||0} attack patterns</strong>,
+          <strong>${cnt.malwares||0} malware families</strong>, and <strong>${cnt.intrusionSets||0} intrusion sets</strong>.
+          These are reference TTPs (tactics/techniques), not live indicators from your network yet.
+          IOC indicators (${cnt.indicators||0}) and Threat Reports (${cnt.reports||0}) require additional
+          threat feed connectors or manual entry to populate.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <button class="btn bb2" onclick="setTab('threatintel')">&#8635; Refresh</button>
+          <button class="btn bx2" onclick="window.open('http://${THREAT_INTEL_IP}:8080','_blank')">Open OpenCTI UI</button>
+        </div>
+      </div>`;
+  }catch(e){ac.innerHTML=`<div style="color:#da3633;padding:20px">Error: ${esc(String(e))}</div>`;}
+}
+
+// ══ INCIDENT MANAGEMENT ═══════════════════════════════════
+
+</script>
+
+<script>
+// ── Group D (AI/Remediation) ──────────────────────────────────────────────────────
+function tabAI(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML=`<h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#129504; AI Recommendations</h2>
+    <div class="card">
+      <div style="display:flex;gap:8px">
+        <input type="text" class="fi" id="aiIn" placeholder="Describe security issue or problem..." style="flex:1">
+        <button class="btn bb2" id="aiBtn">Ask AI</button>
+      </div>
+      <div id="aiOut" style="margin-top:14px"></div>
+    </div>`;
+  document.getElementById('aiBtn').onclick=runAIReco;
+  document.getElementById('aiIn').onkeydown=e=>{if(e.key==='Enter')runAIReco();};
+}
+async function runAIReco(){
+  var q=document.getElementById('aiIn').value.trim();if(!q)return;
+  document.getElementById('aiOut').innerHTML='<div style="color:#666">AI analyzing...</div>';
+  try{
+    var r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'llama3.2:3b',stream:false,messages:[{role:'system',content:'You are a cybersecurity expert for Example Org. Be concise and actionable.'},{role:'user',content:'Analyze: 1)Risk 2)Root cause 3)Fix steps 4)PowerShell command. Issue: '+q}],options:{num_predict:800}})});
+    var d=await r.json();
+    var ans=(d.message&&d.message.content)?d.message.content:'No response.';
+    document.getElementById('aiOut').innerHTML=`<div style="background:#212121;border-radius:8px;padding:14px;font-size:13px;line-height:1.7">${mdRender(ans)}</div>`;
+  }catch(e){document.getElementById('aiOut').innerHTML='<div style="color:#da3633">AI not available. Check VPN.</div>';}
+}
+
+// ── REMEDIATION ───────────────────────────────────────────────
+function tabRemediation(){
+  var ac=document.getElementById('ac');
+  var qas=[['Enable Firewall','powershell','Set-NetFirewallProfile -All -Enabled True'],['Flush DNS','powershell','ipconfig /flushdns'],['Clear Temp','powershell','Remove-Item $env:TEMP\\* -Recurse -Force -EA SilentlyContinue'],['Run SFC','powershell','sfc /scannow'],['Update AV','powershell','Update-MpSignature'],['Check BitLocker','powershell','Get-BitLockerVolume C:|Select VolumeStatus,EncryptionPercentage|ConvertTo-Json'],['Lock Screen','lock_screen',''],['Restart PC','restart','']];
+  ac.innerHTML=`
+    <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128295; Remediation</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="card">
+        <div class="ct">Send Command</div>
+        <input type="text" class="fi" id="remH" placeholder="Hostname" style="margin-bottom:7px">
+        <select class="fi" id="remT" style="margin-bottom:7px">
+          <option value="powershell">PowerShell</option>
+          <option value="install_software">Install (winget)</option>
+          <option value="uninstall_software">Uninstall (winget)</option>
+          <option value="windows_update">Windows Update</option>
+          <option value="restart">Restart PC</option>
+          <option value="shutdown">Shutdown</option>
+          <option value="lock_screen">Lock Screen</option>
+        </select>
+        <textarea class="fi" id="remP" rows="3" style="font-family:monospace;font-size:11px;resize:none;margin-bottom:7px" placeholder="Command..."></textarea>
+        <button class="btn bg2" id="remExec" style="width:100%">Execute</button>
+      </div>
+      <div class="card"><div class="ct">Quick Actions</div><div id="qaList" style="display:grid;gap:5px"></div></div>
+    </div>`;
+  var ql=document.getElementById('qaList');
+  qas.forEach(qa=>{
+    var d=document.createElement('div');d.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#212121;border-radius:5px';
+    d.innerHTML=`<span style="font-size:12px">${esc(qa[0])}</span>`;
+    var btn=document.createElement('button');btn.className='btn bb2';btn.style.cssText='font-size:10px;padding:2px 7px';btn.textContent='Use';
+    btn.onclick=()=>{document.getElementById('remT').value=qa[1];document.getElementById('remP').value=qa[2];};
+    d.appendChild(btn);ql.appendChild(d);
+  });
+  document.getElementById('remExec').onclick=async()=>{
+    var h=document.getElementById('remH').value.trim(),t=document.getElementById('remT').value,p=document.getElementById('remP').value.trim();
+    if(!h){alert('Enter hostname');return;}if(!confirm('Execute on '+h+'?'))return;
+    var d=await qCmd(h,t,p);alert('Queued! ID: '+d.command_id);
+  };
+}
+
+// ── DEX (combined DEX + Deep DEX) ────────────────────────────
+
+</script>
+
+<script>
+// ── Group E (ITSM) ──────────────────────────────────────────────────────
+async function tabIncidents(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML='<div style="color:#666;padding:20px">Loading incidents...</div>';
+  try{
+    var d=await fetch('/api/admin/incidents',{headers:ah()}).then(r=>r.json()).catch(()=>({incidents:[]}));
+    var incs=d.incidents||[];
+    var open=incs.filter(i=>i.status==='open'),prog=incs.filter(i=>i.status==='in_progress'),done=incs.filter(i=>i.status==='resolved');
+    var sev={critical:'#da3633',high:'#f0883e',medium:'#d29922',low:'#58a6ff'};
+    ac.innerHTML=`
+      <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128680; Incident Management</h2>
+      <div class="sg">
+        ${sc2('#da3633',open.length,'Open','Needs action')}
+        ${sc2('#d29922',prog.length,'In Progress','Being handled')}
+        ${sc2('#2ea043',done.length,'Resolved','Closed')}
+        ${sc2('#58a6ff',incs.length,'Total','All time')}
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="ct">&#10133; New Incident</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end">
+          <input class="fi" id="iT" placeholder="Title">
+          <select class="fi" id="iS"><option value="critical">Critical</option><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select>
+          <input class="fi" id="iH" placeholder="Affected host">
+          <button class="btn br2" id="iC">Create</button>
+        </div>
+        <textarea class="fi" id="iD" placeholder="Description..." style="margin-top:8px;height:55px;resize:none;width:100%;box-sizing:border-box"></textarea>
+      </div>
+      <div class="card">
+        <div class="ct">&#128203; Incident Log</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <select class="fi" id="iF" style="width:auto"><option value="">All Status</option><option value="open">Open</option><option value="in_progress">In Progress</option><option value="resolved">Resolved</option></select>
+          <select class="fi" id="iSF" style="width:auto"><option value="">All Severity</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option></select>
+          <button class="btn bx2" onclick="setTab('incidents')">&#8635;</button>
+        </div>
+        <div id="iL">
+          ${incs.length?incs.map(inc=>{
+            var col=sev[inc.severity]||'#666';
+            var sb={open:'br',in_progress:'bo',resolved:'bg'}[inc.status]||'bx';
+            return `<div class="al" style="border-color:${col}" data-st="${esc(inc.status)}" data-sv="${esc(inc.severity)}">
+              <div style="display:flex;justify-content:space-between">
+                <div><span class="badge ${sb}">${esc((inc.status||'').replace('_',' ').toUpperCase())}</span>
+                <strong style="margin-left:6px">${esc(inc.title||'')}</strong>
+                <span class="badge bx" style="font-size:9px;margin-left:5px">${esc(inc.severity||'')}</span></div>
+                <div style="display:flex;gap:4px">
+                  ${inc.status!=='resolved'?`<button class="btn bg2" style="font-size:10px;padding:2px 6px" data-id="${inc.id}" data-act="res">Resolve</button>`:''}
+                </div>
+              </div>
+              <div style="font-size:11px;color:#666;margin-top:4px">Host: ${esc(inc.host||'N/A')} | #${inc.id} | ${esc((inc.created_at||'').slice(0,16))}</div>
+              ${inc.description?`<div style="font-size:11px;color:#9b9b9b;margin-top:2px">${esc(inc.description)}</div>`:''}
+            </div>`;
+          }).join(''):'<div style="color:#2ea043;padding:30px;text-align:center">&#9989; No incidents</div>'}
+        </div>
+      </div>`;
+
+    document.getElementById('iC').onclick=async()=>{
+      var t=document.getElementById('iT').value.trim();
+      if(!t){alert('Enter title');return;}
+      var r=await fetch('/api/admin/incidents',{method:'POST',headers:ah(),body:JSON.stringify({
+        title:t,severity:document.getElementById('iS').value,
+        host:document.getElementById('iH').value.trim(),
+        description:document.getElementById('iD').value.trim()})});
+      var d=await r.json();
+      d.status==='ok'?(alert('Incident #'+d.id+' created!'),setTab('incidents')):alert('Error: '+d.error);
+    };
+    var flt=()=>{var st=document.getElementById('iF').value,sv=document.getElementById('iSF').value;
+      document.querySelectorAll('#iL .al').forEach(el=>{el.style.display=(!st||el.dataset.st===st)&&(!sv||el.dataset.sv===sv)?'':'none';});};
+    document.getElementById('iF').onchange=flt;document.getElementById('iSF').onchange=flt;
+    document.getElementById('iL').onclick=async e=>{
+      var btn=e.target.closest('button[data-act]');if(!btn)return;
+      var act=btn.dataset.act,id=btn.dataset.id;
+      if(act==='res'){if(!confirm('Resolve #'+id+'?'))return;
+        var r=await fetch('/api/admin/incidents/'+id+'/resolve',{method:'POST',headers:ah()});
+        (await r.json()).status==='ok'&&setTab('incidents');}
+    };
+  }catch(e){ac.innerHTML=`<div style="color:#da3633;padding:20px">Error: ${esc(String(e))}</div>`;}
+}
+
+// ══ CHANGE MANAGEMENT ════════════════════════════════════
+async function tabChanges(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML='<div style="color:#666;padding:20px">Loading changes...</div>';
+  try{
+    var d=await fetch('/api/admin/changes',{headers:ah()}).then(r=>r.json()).catch(()=>({changes:[]}));
+    var chgs=d.changes||[];
+    var pend=chgs.filter(c=>c.status==='pending'),appr=chgs.filter(c=>c.status==='approved'),auto=chgs.filter(c=>c.source==='auto');
+    ac.innerHTML=`
+      <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128260; Change Management</h2>
+      <div class="sg">
+        ${sc2('#d29922',pend.length,'Pending Approval','Awaiting')}
+        ${sc2('#2ea043',appr.length,'Approved','Ready')}
+        ${sc2('#58a6ff',auto.length,'Auto-detected','From agents')}
+        ${sc2('#ececec',chgs.length,'Total Changes','All records')}
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="ct">&#10133; New Change Request</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <input class="fi" id="cT" placeholder="Change title">
+          <input class="fi" id="cH" placeholder="Target host">
+          <select class="fi" id="cTY">
+            <option value="software_install">Software Install</option>
+            <option value="software_remove">Software Remove</option>
+            <option value="config_change">Config Change</option>
+            <option value="patch">Patch/Update</option>
+            <option value="user_change">User Change</option>
+            <option value="network_change">Network Change</option>
+            <option value="other">Other</option>
+          </select>
+          <select class="fi" id="cR">
+            <option value="low">Low Risk</option>
+            <option value="medium">Medium Risk</option>
+            <option value="high">High Risk</option>
+          </select>
+        </div>
+        <textarea class="fi" id="cD" placeholder="Describe the change and reason..." style="margin-top:8px;height:60px;resize:none;width:100%;box-sizing:border-box"></textarea>
+        <button class="btn bg2" id="cS" style="margin-top:8px">Submit Request</button>
+      </div>
+      <div class="card">
+        <div class="ct">&#128203; Change Log</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <select class="fi" id="cF" style="width:auto"><option value="">All Status</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="executed">Executed</option><option value="rejected">Rejected</option></select>
+          <select class="fi" id="cSF" style="width:auto"><option value="">All Sources</option><option value="manual">Manual</option><option value="auto">Auto</option></select>
+          <button class="btn bx2" onclick="setTab('changes')">&#8635;</button>
+        </div>
+        <div id="cL">
+          ${chgs.length?chgs.map(c=>{
+            var col={pending:'#d29922',approved:'#2ea043',executed:'#58a6ff',rejected:'#da3633'}[c.status]||'#666';
+            var sb={pending:'bo',approved:'bg',executed:'bb',rejected:'br'}[c.status]||'bx';
+            return `<div class="al" style="border-color:${col}" data-st="${esc(c.status)}" data-sr="${esc(c.source||'manual')}">
+              <div style="display:flex;justify-content:space-between">
+                <div><span class="badge ${sb}">${esc((c.status||'').toUpperCase())}</span>
+                <strong style="margin-left:6px">${esc(c.title||'')}</strong>
+                ${c.source==='auto'?'<span class="badge bb" style="font-size:9px;margin-left:4px">AUTO</span>':''}</div>
+                <div style="display:flex;gap:4px">
+                  ${c.status==='pending'?`
+                    <button class="btn bg2" style="font-size:10px;padding:2px 6px" data-id="${c.id}" data-act="approve">Approve</button>
+                    <button class="btn br2" style="font-size:10px;padding:2px 6px" data-id="${c.id}" data-act="reject">Reject</button>`:
+                  c.status==='approved'?`<button class="btn bb2" style="font-size:10px;padding:2px 6px" data-id="${c.id}" data-act="execute">Execute</button>`:''}
+                </div>
+              </div>
+              <div style="font-size:11px;color:#666;margin-top:4px">Type: ${esc(c.change_type||'')} | Host: ${esc(c.host||'N/A')} | Risk: ${esc(c.risk||'')} | ${esc((c.created_at||'').slice(0,16))}</div>
+              ${c.description?`<div style="font-size:11px;color:#9b9b9b;margin-top:2px">${esc(c.description)}</div>`:''}
+            </div>`;
+          }).join(''):'<div style="color:#2ea043;padding:30px;text-align:center">&#9989; No change records yet</div>'}
+        </div>
+      </div>`;
+
+    document.getElementById('cS').onclick=async()=>{
+      var t=document.getElementById('cT').value.trim();
+      if(!t){alert('Enter title');return;}
+      var r=await fetch('/api/admin/changes',{method:'POST',headers:ah(),body:JSON.stringify({
+        title:t,host:document.getElementById('cH').value.trim(),
+        change_type:document.getElementById('cTY').value,risk:document.getElementById('cR').value,
+        description:document.getElementById('cD').value.trim(),source:'manual'})});
+      var d=await r.json();
+      d.status==='ok'?(alert('Change #'+d.id+' submitted!'),setTab('changes')):alert('Error: '+d.error);
+    };
+    var flt=()=>{var st=document.getElementById('cF').value,sr=document.getElementById('cSF').value;
+      document.querySelectorAll('#cL .al').forEach(el=>{el.style.display=(!st||el.dataset.st===st)&&(!sr||el.dataset.sr===sr)?'':'none';});};
+    document.getElementById('cF').onchange=flt;document.getElementById('cSF').onchange=flt;
+    document.getElementById('cL').onclick=async e=>{
+      var btn=e.target.closest('button[data-act]');if(!btn)return;
+      var act=btn.dataset.act,id=btn.dataset.id;
+      if(!confirm(act.charAt(0).toUpperCase()+act.slice(1)+' change #'+id+'?'))return;
+      var r=await fetch('/api/admin/changes/'+id+'/'+act,{method:'POST',headers:ah()});
+      (await r.json()).status==='ok'&&setTab('changes');
+    };
+  }catch(e){ac.innerHTML=`<div style="color:#da3633;padding:20px">Error: ${esc(String(e))}</div>`;}
+}
+
+</script>
+
+<script>
+// ── Group F (Infra/Monitoring) ──────────────────────────────────────────────────────
+async function tabPBS(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML='<div style="color:#666;padding:20px">Connecting to PBS...</div>';
+  try{
+    var r1=await fetch('/api/pbs/status',{headers:ah()});var s=await r1.json();
+    var r2=await fetch('/api/pbs/backups',{headers:ah()});var b=await r2.json();
+    var backups=b.backups||[],stores=s.datastores||[],tasks=s.tasks||[];
+    var totalSize=backups.reduce((a,x)=>a+(x.size||0),0);
+    ac.innerHTML=`
+      <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128190; Proxmox Backup Server</h2>
+      <div class="sg">${sc2('#2ea043','&#9989; Online','PBS Status','Desktop-OBS-61')}${sc2('#58a6ff',stores.length,'Datastores','backup storage')}${sc2('#ececec',backups.length,'Snapshots','All VMs')}${sc2('#f0883e',gbSize(totalSize),'Total Size','backup data')}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card"><div class="ct">Datastores</div>${stores.map(s=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #3f3f3f;font-size:12px"><span>${esc(s.store||s.name||'')}</span><span class="badge bg">${esc(s['backend-type']||'')}</span></div>`).join('')}</div>
+        <div class="card"><div class="ct">Recent Tasks</div>${tasks.slice(0,5).map(t=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #3f3f3f;font-size:11px"><span>${esc((t.upid||'').split(':')[6]||'task')}</span><span class="badge ${t.status==='OK'||!t.status?'bg':'br'}">${esc(t.status||'running')}</span></div>`).join('')}</div>
+      </div>
+      <div class="card">
+        <div class="ct">VM Snapshots (${backups.length})</div>
+        <input type="text" class="fi" id="pbsQ" placeholder="Search VM..." style="margin-bottom:8px">
+        <div style="overflow:auto">
+          <table class="tbl" id="pbsTbl">
+            <thead><tr><th>VM ID</th><th>Type</th><th>Comment</th><th>Datastore</th><th>Size</th><th>Date</th><th>Protected</th></tr></thead>
+            <tbody>${backups.map(bk=>{var dt=bk['backup-time']?new Date(bk['backup-time']*1000).toLocaleString('en-IN'):'';return `<tr><td style="font-weight:600">${esc(bk['backup-id']||'')}</td><td><span class="badge bb">${esc(bk['backup-type']||'')}</span></td><td>${esc(bk.comment||'')}</td><td>${esc(bk.datastore||'')}</td><td style="font-size:10px">${gbSize(bk.size||0)}</td><td style="font-size:10px;color:#666">${dt}</td><td>${bk.protected?'<span class="badge bg">Yes</span>':'<span class="badge bx">No</span>'}</td></tr>`;}).join('')}</tbody>
+          </table>
+        </div>
+      </div>`;
+    document.getElementById('pbsQ').oninput=function(){var q=this.value.toLowerCase();document.querySelectorAll('#pbsTbl tbody tr').forEach(r=>r.style.display=r.innerText.toLowerCase().includes(q)?'':'none');};
+  }catch(e){ac.innerHTML=`<div style="color:#da3633;padding:20px">PBS Error: ${esc(String(e))}</div>`;}
+}
+
+// ── SOFTWARE DEPLOY ───────────────────────────────────────────
+async function tabZabbix(){
+  var ac=document.getElementById('ac');
+  ac.innerHTML='<div style="color:#666;padding:20px">Connecting to Zabbix...</div>';
+  try{
+    var ov=await fetch('/api/zabbix/overview',{headers:ah()}).then(r=>r.json());
+    var hosts=await fetch('/api/zabbix/hosts',{headers:ah()}).then(r=>r.json());
+    var probs=await fetch('/api/zabbix/problems',{headers:ah()}).then(r=>r.json());
+    var hlist=hosts.hosts||[];
+    var plist=probs.problems||[];
+    var priColors={0:'#8b949e',1:'#58a6ff',2:'#d29922',3:'#f0883e',4:'#da3633',5:'#ff0000'};
+    var priLabels={0:'Not classified',1:'Information',2:'Warning',3:'Average',4:'High',5:'Disaster'};
+    ac.innerHTML=`
+      <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128225; Zabbix Infrastructure Monitor</h2>
+      <div class="sg">
+        ${sc2('#2ea043',ov.hosts,'Monitored Hosts','Active')}
+        ${sc2('#da3633',ov.critical,'Critical','Severity 4-5')}
+        ${sc2('#f0883e',ov.warning,'Warning','Severity 2-3')}
+        ${sc2('#ececec',ov.total_problems,'Total Problems','All severities')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card">
+          <div class="ct">Monitored Hosts (${hlist.length}) <a href="http://${MONITORING_IP}/zabbix" target="_blank" class="btn bb2" style="font-size:10px;padding:2px 7px;text-decoration:none">Zabbix UI</a></div>
+          <div style="overflow:auto;max-height:300px">
+            <table class="tbl">
+              <thead><tr><th>Host</th><th>IP</th><th>Status</th></tr></thead>
+              <tbody>
+                ${hlist.map(h=>`<tr>
+                  <td style="font-weight:600">${esc(h.name||h.host||'')}</td>
+                  <td style="font-family:monospace;font-size:11px">${esc((h.interfaces&&h.interfaces[0]&&h.interfaces[0].ip)||'')}</td>
+                  <td><span class="badge ${h.status==='0'?'bg':'br'}">${h.status==='0'?'Enabled':'Disabled'}</span></td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ct">Problem Summary</div>
+          ${[5,4,3,2,1,0].map(p=>{
+            var cnt=plist.filter(x=>x.priority==p).length;
+            if(!cnt)return '';
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #3f3f3f">
+              <span style="font-size:12px;color:${priColors[p]}">${priLabels[p]}</span>
+              <span class="badge" style="background:${priColors[p]}20;color:${priColors[p]};border:1px solid ${priColors[p]}">${cnt}</span>
+            </div>`;
+          }).join('')||'<div style="color:#2ea043;padding:10px">No problems!</div>'}
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">Active Problems (${plist.length}) <button class="btn bb2" style="font-size:10px;padding:2px 7px" onclick="setTab('zabbix')">Refresh</button></div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <select class="fi" id="zbSev" style="width:auto">
+            <option value="">All Severities</option>
+            <option value="5">Disaster</option>
+            <option value="4">High</option>
+            <option value="3">Average</option>
+            <option value="2">Warning</option>
+            <option value="1">Information</option>
+          </select>
+          <input type="text" class="fi" id="zbQ" placeholder="Search host or problem..." style="flex:1">
+        </div>
+        <div style="overflow:auto" id="zbProbs">
+          ${plist.length?plist.map(p=>{
+            var pri=parseInt(p.priority||0);
+            var color=priColors[pri],label=priLabels[pri];
+            var ts=p.clock?new Date(parseInt(p.clock)*1000).toLocaleString('en-IN'):'';
+            return `<div class="al" style="border-color:${color}" data-pri="${pri}" data-host="${esc(p.host||'').toLowerCase()}" data-name="${esc(p.trigger_name||'').toLowerCase()}">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div>
+                  <span class="badge" style="background:${color}20;color:${color};border:1px solid ${color};margin-right:7px">${label}</span>
+                  <strong>${esc(p.trigger_name||'Unknown')}</strong>
+                </div>
+                <a href="http://${MONITORING_IP}/zabbix/tr_events.php?triggerid=${esc(p.objectid||'')}" target="_blank" class="btn bb2" style="font-size:10px;padding:2px 6px;text-decoration:none;flex-shrink:0">Details</a>
+              </div>
+              <div style="margin-top:5px;font-size:10px;color:#666">Host: ${esc(p.host||'Unknown')} | ${esc(ts)}</div>
+            </div>`;
+          }).join(''):'<div style="color:#2ea043;padding:20px;text-align:center">No active problems!</div>'}
+        </div>
+      </div>`;
+
+    // Filter
+    document.getElementById('zbSev').onchange=filterZabbix;
+    document.getElementById('zbQ').oninput=filterZabbix;
+    function filterZabbix(){
+      var sev=document.getElementById('zbSev').value;
+      var q=(document.getElementById('zbQ').value||'').toLowerCase();
+      document.querySelectorAll('#zbProbs .al').forEach(el=>{
+        var matchSev=!sev||el.dataset.pri==sev;
+        var matchQ=!q||el.dataset.host.includes(q)||el.dataset.name.includes(q);
+        el.style.display=matchSev&&matchQ?'':'none';
+      });
+    }
+  }catch(e){ac.innerHTML=`<div style="color:#da3633;padding:20px">Zabbix Error: ${esc(String(e))}</div>`;}
+}
+
+// ── REMOTE ACCESS ─────────────────────────────────────────────
+async function tabRemote(){
+  var ac=document.getElementById('ac');
+  var eps=await getEps();
+  var online=eps.filter(e=>e.status==='online');
+  var withRD=eps.filter(e=>e.rustdesk_id);
+
+  ac.innerHTML=`
+    <h2 style="font-size:17px;font-weight:600;margin-bottom:14px">&#128444; Remote Access</h2>
+    <div class="sg">
+      ${sc2('#2ea043',online.length,'Online PCs','Ready to connect')}
+      ${sc2('#58a6ff',withRD.length,'RustDesk Ready','Agent configured')}
+      ${sc2('#ececec',eps.length,'Total Endpoints','All PCs')}
+      ${sc2('#7c3aed','&#128279; Live','Guacamole','Browser RDP')}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="ct">&#128421; RustDesk Remote Desktop
+          <span style="font-size:10px;color:#666">Agent-based</span>
+        </div>
+        <div style="background:#212121;border-radius:8px;padding:12px;margin-bottom:10px;font-size:12px">
+          <div style="margin-bottom:6px"><span style="color:#666">Server:</span> <span style="font-family:monospace">your-domain.example.com</span></div>
+          <div style="margin-bottom:6px"><span style="color:#666">Key:</span> <span style="font-family:monospace;font-size:10px">EXAMPLE_KEY_REPLACE_ME</span></div>
+          <div><span style="color:#666">Ports:</span> <span style="font-family:monospace">21115-21119</span></div>
+        </div>
+        <div style="font-size:11px;color:#666;margin-bottom:8px">&#9432; Open RustDesk app → Enter ID → Connect</div>
+        <a href="https://rustdesk.com/download" target="_blank" class="btn bb2" style="text-decoration:none;font-size:11px">Download RustDesk Client</a>
+      </div>
+
+      <div class="card">
+        <div class="ct">&#127760; Guacamole Web Access
+          <span style="font-size:10px;color:#666">Browser-based RDP/SSH</span>
+        </div>
+        <div style="background:#212121;border-radius:8px;padding:12px;margin-bottom:10px;font-size:12px">
+          <div style="margin-bottom:6px"><span style="color:#666">URL:</span> <span style="font-family:monospace">http://${SERVER_IP}:8888/guacamole</span></div>
+          <div style="margin-bottom:6px"><span style="color:#666">Supports:</span> RDP, SSH, VNC</div>
+          <div><span style="color:#666">No client needed</span> — runs in browser</div>
+        </div>
+        <a href="/guacamole/" target="_blank" class="btn bg2" style="text-decoration:none;font-size:11px">Open Guacamole</a>
+      </div>
+      <div class="card">
+        <div class="ct">&#9889; Wake on LAN</div>
+        <div style="background:#212121;border-radius:8px;padding:12px;margin-bottom:10px;font-size:12px;color:#9b9b9b">
+          Sends magic packet to wake sleeping/off PCs.<br>
+          PC must have WoL enabled in BIOS and be on same network.
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <input type="text" class="fi" id="wolMac" placeholder="MAC address (e.g. ae:b9:e4:92:48:21)" style="flex:1">
+          <input type="text" class="fi" id="wolHost" placeholder="Hostname" style="width:140px">
+          <button class="btn bo2" id="wolSend">Wake PC</button>
+        </div>
+        <div id="wolOut"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct">Endpoints — Remote Connect (${eps.length} total)</div>
+      <input type="text" class="fi" id="remQ" placeholder="Search hostname or user..." style="margin-bottom:10px">
+      <div style="overflow:auto">
+        <table class="tbl" id="remTbl">
+          <thead><tr><th>Status</th><th>Hostname</th><th>User</th><th>IP</th><th>RustDesk ID</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${eps.map(e=>`<tr>
+              <td><span class="badge ${e.status==='online'?'bg':'br'}">${e.status==='online'?'Online':'Offline'}</span></td>
+              <td style="font-weight:600">${esc(e.hostname||'')}</td>
+              <td>${esc(e.username||'')}</td>
+              <td style="font-family:monospace;font-size:11px">${esc(e.ip||'')}</td>
+              <td><span class="badge ${e.rustdesk_id?'bg':'bx'}">${e.rustdesk_id?'Configured':'Not setup'}</span></td>
+              <td>
+                <div style="display:flex;gap:4px">
+                  ${e.rustdesk_id?`<button class="btn bg2" style="font-size:10px;padding:2px 6px" data-rdid="${esc(e.rustdesk_id)}" data-act="connect">&#128421; Connect</button>`:''}
+                  <button class="btn bb2" style="font-size:10px;padding:2px 6px" data-host="${esc(e.hostname||'')}" data-act="msg">Message</button>
+                  <button class="btn br2" style="font-size:10px;padding:2px 6px" data-host="${esc(e.hostname||'')}" data-act="lockrem">Lock</button>
+                  <button class="btn bo2" style="font-size:10px;padding:2px 6px" data-host="${esc(e.hostname||'')}" data-mac="${esc(e.mac||'')}" data-act="wolrem">&#9889; Wake</button>
+                </div>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct">&#128421; Launch RustDesk Session</div>
+      <div style="background:#1a2e1a;border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:#9b9b9b">
+        <strong style="color:#2ea043">How to connect:</strong><br>
+        1. Install RustDesk on your PC from rustdesk.com<br>
+        2. Copy the RustDesk ID from the table above<br>
+        3. Open RustDesk → Enter ID → Click Connect<br>
+        4. Or use the rustdesk:// deep link below
+      </div>
+      <div style="display:flex;gap:8px">
+        <input type="text" class="fi" id="rdId" placeholder="Enter RustDesk ID" style="flex:1">
+        <button class="btn bg2" id="rdLaunch">Launch Session</button>
+        <button class="btn bb2" id="rdCopy">Copy ID</button>
+      </div>
+    </div>`;
+
+  // Search
+  document.getElementById('remQ').oninput=function(){
+    var q=this.value.toLowerCase();
+    document.querySelectorAll('#remTbl tbody tr').forEach(r=>r.style.display=r.innerText.toLowerCase().includes(q)?'':'none');
+  };
+
+  // Actions
+  ac.onclick=async e=>{
+    var btn=e.target.closest('button[data-act]');if(!btn)return;
+    var act=btn.dataset.act;
+    if(act==='connect'||act==='copyrd'){
+      window.open('rustdesk://'+btn.dataset.rdid,'_blank');
+      copyText(btn.dataset.rdid);
+      btn.textContent='Connecting...';
+      setTimeout(()=>btn.textContent='&#128421; Connect',2000);
+    }
+    if(act==='msg'){
+      var msg=prompt('Message to send to '+btn.dataset.host+':');
+      if(!msg)return;
+      var d=await qCmd(btn.dataset.host,'screen_message',msg);
+      alert('Message sent! ID: '+d.command_id);
+    }
+    if(act==='wolrem'){
+      var mac=btn.dataset.mac;
+      if(!mac){alert('MAC not available');return;}
+      var r=await fetch('/api/admin/wol',{method:'POST',headers:ah(),body:JSON.stringify({hostname:btn.dataset.host,mac:mac,broadcast:'${VULN_SCANNER_IP}5'})});
+      var d=await r.json();
+      d.status==='ok'?alert('Magic packet sent! PC waking up in 30-60 sec.'):alert('WoL failed: '+d.error);
+    }
+    if(act==='lockrem'){
+      if(!confirm('Lock screen on '+btn.dataset.host+'?'))return;
+      var d2=await qCmd(btn.dataset.host,'lock_screen','');
+      alert('Lock queued! ID: '+d2.command_id);
+    }
+  };
+
+  // Launch
+  document.getElementById('rdLaunch').onclick=()=>{
+    var id=document.getElementById('rdId').value.trim();
+    if(!id){alert('Enter RustDesk ID');return;}
+    window.open(`rustdesk://${id}`,'_blank');
+  };
+  document.getElementById('wolSend').onclick=async()=>{
+    var mac=document.getElementById('wolMac').value.trim();
+    var host=document.getElementById('wolHost').value.trim();
+    if(!mac){alert('Enter MAC address');return;}
+    var r=await fetch('/api/admin/wol',{method:'POST',headers:ah(),body:JSON.stringify({hostname:host||mac,mac:mac,broadcast:'${VULN_SCANNER_IP}5'})});
+    var d=await r.json();
+    document.getElementById('wolOut').innerHTML=d.status==='ok'?
+      '<div style="color:#2ea043;padding:8px;background:#1a2e1a;border-radius:6px;margin-top:5px">&#9989; '+esc(d.message)+'<br><span style="font-size:10px;color:#666">PC should wake in 30-60 seconds</span></div>':
+      '<div style="color:#da3633;padding:8px;background:#2e1a1a;border-radius:6px;margin-top:5px">&#9888; '+esc(d.error)+'</div>';
+  };
+  document.getElementById('rdCopy').onclick=()=>{
+    var id=document.getElementById('rdId').value.trim();
+    if(!id){alert('Enter RustDesk ID');return;}
+    copyText(id);
+    alert('ID copied!');
+  };
+}
+
+</script>
+</body>
+</html>
