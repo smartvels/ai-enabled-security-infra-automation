@@ -29,6 +29,8 @@ LOCALAI_URL = os.environ.get(
 )
 LOCALAI_MODEL = os.environ.get("LOCALAI_MODEL", "Qwen2.5-7B-Instruct-Q4_K_M.gguf")
 LISTEN_PORT = int(os.environ.get("LISTEN_PORT", "5050"))
+# Bind to localhost by default; set LISTEN_HOST=0.0.0.0 explicitly to expose on the network
+LISTEN_HOST = os.environ.get("LISTEN_HOST", "127.0.0.1")
 
 SYSTEM_PROMPT = (
     "You are a SOC analyst. Classify this Wazuh alert as true_positive or "
@@ -90,4 +92,4 @@ def healthz():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=LISTEN_PORT)
+    app.run(host=LISTEN_HOST, port=LISTEN_PORT)
