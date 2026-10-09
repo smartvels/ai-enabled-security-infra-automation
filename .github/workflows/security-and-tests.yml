@@ -1,0 +1,51 @@
+name: Security scan and tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  secrets-scan:
+    name: Secrets scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  python-security:
+    name: SAST (bandit) + dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install scanners
+        run: pip install bandit pip-audit
+      - name: Bandit SAST scan
+        run: bandit -r triage-service/ -x triage-service/tests,triage-service/venv -ll
+      - name: Dependency vulnerability audit
+        run: pip-audit -r triage-service/requirements.txt
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install -r triage-service/requirements.txt
+          pip install pytest
+      - name: Run tests
+        run: |
+          cd triage-service
+          PYTHONPATH=. python -m pytest tests/ -v
