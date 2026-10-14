@@ -1,0 +1,114 @@
+name: Security scan and tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  secrets-scan:
+    name: Secrets scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  python-security:
+    name: SAST (bandit) + dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install scanners
+        run: pip install bandit pip-audit
+      - name: Bandit SAST scan
+        run: bandit -r triage-service/ security/ it-assistant-portal/ -x triage-service/tests,triage-service/venv,security/tests,it-assistant-portal/tests -ll
+      - name: Dependency vulnerability audit
+        run: |
+          pip-audit -r triage-service/requirements.txt
+          pip-audit -r it-assistant-portal/requirements.txt
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install -r triage-service/requirements.txt
+          pip install pytest
+      - name: Run triage service tests
+        run: |
+          cd triage-service
+          PYTHONPATH=. python -m pytest tests/ -v
+      - name: Run active-response tests
+        run: python -m pytest security/tests/ -v
+
+  portal-tests:
+    name: Portal security regression tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install -r it-assistant-portal/requirements.txt
+          pip install httpx==0.28.1 pytest
+      - name: Run tests
+        run: python -m pytest it-assistant-portal/tests/ -v
+
+  container-security:
+    name: Container build + Trivy scan + SBOM
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    env:
+      # Trivy runs from its official image, pinned to an exact version
+      TRIVY_IMAGE: aquasec/trivy:0.58.1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan Dockerfile for misconfigurations
+        run: >
+          docker run --rm
+          -v "$PWD:/src" -v "$HOME/.cache/trivy:/root/.cache/trivy"
+          "$TRIVY_IMAGE" config --exit-code 1 --severity HIGH,CRITICAL
+          /src/triage-service
+
+      - name: Build image
+        run: docker build -t triage-service:ci triage-service/
+
+      - name: Scan image for vulnerabilities (fail on fixable HIGH/CRITICAL)
+        run: >
+          docker run --rm
+          -v /var/run/docker.sock:/var/run/docker.sock
+          -v "$HOME/.cache/trivy:/root/.cache/trivy"
+          "$TRIVY_IMAGE" image --exit-code 1 --ignore-unfixed
+          --severity HIGH,CRITICAL triage-service:ci
+
+      - name: Generate SBOM (CycloneDX)
+        run: >
+          docker run --rm
+          -v /var/run/docker.sock:/var/run/docker.sock
+          -v "$HOME/.cache/trivy:/root/.cache/trivy"
+          -v "$PWD:/out"
+          "$TRIVY_IMAGE" image --format cyclonedx
+          --output /out/sbom.cdx.json triage-service:ci
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: triage-service-sbom
+          path: sbom.cdx.json
