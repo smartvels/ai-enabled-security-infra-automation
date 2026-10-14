@@ -5,26 +5,34 @@ on:
   push:
     branches: [main]
 
+# Least privilege for the workflow's GITHUB_TOKEN
+permissions:
+  contents: read
+  pull-requests: read
+
+# Third-party actions are pinned to full commit SHAs (tags can be moved;
+# SHAs cannot), with the human-readable version in a comment.
+
 jobs:
   secrets-scan:
     name: Secrets scan (gitleaks)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_CONFIG: .gitleaks.toml
 
   python-security:
     name: SAST (bandit) + dependency audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Install scanners
@@ -38,10 +46,10 @@ jobs:
 
   unit-tests:
     name: Unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Install dependencies
@@ -57,10 +65,10 @@ jobs:
 
   portal-tests:
     name: Portal security regression tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Install dependencies
@@ -72,13 +80,13 @@ jobs:
 
   container-security:
     name: Container build + Trivy scan + SBOM
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: unit-tests
     env:
       # Trivy runs from its official image, pinned to an exact version
-      TRIVY_IMAGE: aquasec/trivy:0.58.1
+      TRIVY_IMAGE: aquasec/trivy:0.74.0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Scan Dockerfile for misconfigurations
         run: >
@@ -108,7 +116,7 @@ jobs:
           --output /out/sbom.cdx.json triage-service:ci
 
       - name: Upload SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: triage-service-sbom
           path: sbom.cdx.json
