@@ -4,8 +4,8 @@ A reference implementation of an LLM-assisted SOC (Security Operations
 Center) automation pipeline, built with self-hosted, open-source
 components end to end -- no data leaves the local network.
 
-This is a sanitized version of a pattern I designed and deployed in a
-production security environment. Hostnames, internal IPs, and credentials
+This is a sanitized version of a platform I designed, built, and piloted as
+a proof of concept on 10 endpoints. Hostnames, internal IPs, and credentials
 have been replaced with environment-variable placeholders.
 
 ## What it does
@@ -42,16 +42,22 @@ agents, DLP, remote access, correlation engine, and every integrated
 tool this pattern is designed to work alongside — see
 **[docs/PLATFORM_OVERVIEW.md](docs/PLATFORM_OVERVIEW.md)**.
 
-| Pillar | Tooling | Status in this repo |
+| Pillar | Implementation | Status in this repo |
 |---|---|---|
-| **SOC automation** | SIEM -> LLM -> ITSM ticket | ✅ Live (see below) |
-| **Incident management** | Case management + ticketing | ✅ Ticket creation live |
-| **Asset management** | ITSM tool | Reference — separate component |
-| **Change management** | ITSM tool | Planned — same pattern as incident tickets |
-| **Endpoint control** | Cross-platform agent, remote-desktop relay | Reference — separate component |
-| **DLP** | Endpoint agent + dashboard | Reference — separate component |
-| **General automation** | n8n | ✅ Core orchestration engine for all of the above |
-| **Knowledge / RAG** | pgvector + self-hosted LLM | ✅ Live |
+| **SOC automation** | Wazuh -> LLM triage -> GLPI ticket (`n8n-workflows/`, `triage-service/`) | ✅ Implemented |
+| **Incident management** | Ticket creation plus incident tracking with progress and resolution (`it-assistant-portal/`) | ✅ Implemented |
+| **Asset management** | Endpoint hardware and software inventory reported by agents (`it-assistant-portal/`) | ✅ Implemented (server side) |
+| **Change management** | Change requests with approve / reject / execute workflow (`it-assistant-portal/`) | ✅ Implemented |
+| **Endpoint control** | Remote commands queued for agents, remote-desktop links, staged agent rollouts (`it-assistant-portal/`) | ✅ Implemented (server side) |
+| **DLP** | DLP event collection, summaries, and scan triggers (`it-assistant-portal/`) | ✅ Implemented (server side) |
+| **Automated response** | Wazuh detection rules, kill switch, host and Palo Alto IP blocking (`security/`) | ✅ Implemented, lab-test first |
+| **General automation** | n8n | ✅ Orchestration engine for the above |
+| **Knowledge / RAG** | pgvector + self-hosted LLM (`n8n-workflows/`) | ✅ Implemented |
+
+**Status meaning:** *Implemented* means the code is in this repo. The
+platform was piloted on 10 endpoints as a proof of concept and is not
+running in production. *Server side* means the endpoint agent that feeds
+the feature is not included in this repo.
 
 ## Key design decisions (and why)
 
