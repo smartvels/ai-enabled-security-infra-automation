@@ -1,0 +1,92 @@
+<!--
+  Custom Wazuh rules for the AI triage service.
+  Install on the Wazuh MANAGER: append to /var/ossec/etc/rules/local_rules.xml
+  (or save as /var/ossec/etc/rules/triage_rules.xml), then restart the manager.
+  Rule IDs 100500-100599 are reserved for this pack; change them if they clash.
+
+  Input: JSON lines written by triage.py to SECURITY_LOG_PATH, collected by the
+  agent (see ossec-agent-snippet.xml). FIM rules need the agent syscheck block.
+-->
+<group name="triage,ai_security,">
+
+  <rule id="100500" level="3">
+    <decoded_as>json</decoded_as>
+    <field name="service">^triage$</field>
+    <description>Triage service security event: $(triage_event)</description>
+  </rule>
+
+  <!-- Authentication -->
+  <rule id="100501" level="5">
+    <if_sid>100500</if_sid>
+    <field name="triage_event">^auth_failure$</field>
+    <description>Triage API: authentication failure from $(srcip)</description>
+    <group>authentication_failed,</group>
+  </rule>
+
+  <rule id="100502" level="10" frequency="5" timeframe="120">
+    <if_matched_sid>100501</if_matched_sid>
+    <same_srcip />
+    <description>Triage API: 5+ authentication failures from $(srcip) in 2 minutes (possible brute force)</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+    <group>authentication_failures,</group>
+  </rule>
+
+  <!-- Deception: the decoy token is never used legitimately -->
+  <rule id="100503" level="14">
+    <if_sid>100500</if_sid>
+    <field name="triage_event">^honeytoken_used$</field>
+    <description>Triage API: HONEYTOKEN used from $(srcip) - confirmed intrusion</description>
+    <mitre>
+      <id>T1552</id>
+    </mitre>
+  </rule>
+
+  <!-- AI-specific threats -->
+  <rule id="100504" level="9">
+    <if_sid>100500</if_sid>
+    <field name="triage_event">^injection_suspected$</field>
+    <description>Triage: prompt-injection text found in alert data (rule $(rule_id)); LLM bypassed</description>
+  </rule>
+
+  <rule id="100505" level="12" frequency="3" timeframe="300">
+    <if_matched_sid>100504</if_matched_sid>
+    <description>Triage: repeated prompt-injection attempts in alert data - possible targeted attack on AI triage</description>
+  </rule>
+
+  <!-- Availability -->
+  <rule id="100506" level="7">
+    <if_sid>100500</if_sid>
+    <field name="triage_event">^llm_unavailable$</field>
+    <description>Triage: LLM unavailable, failed safe to ticket creation</description>
+  </rule>
+
+  <rule id="100507" level="12" frequency="5" timeframe="300">
+    <if_matched_sid>100506</if_matched_sid>
+    <description>Triage: sustained LLM outage (5+ failures in 5 minutes)</description>
+  </rule>
+
+  <rule id="100508" level="6">
+    <if_sid>100500</if_sid>
+    <field name="triage_event">^payload_too_large$</field>
+    <description>Triage API: oversized payload rejected from $(srcip)</description>
+  </rule>
+
+  <!-- Tampering (File Integrity Monitoring) -->
+  <rule id="100520" level="12">
+    <if_sid>550,553,554</if_sid>
+    <field name="file">^/opt/triage/</field>
+    <description>Triage deployment file changed: $(file) - possible tampering</description>
+    <mitre>
+      <id>T1565</id>
+    </mitre>
+  </rule>
+
+  <rule id="100521" level="12">
+    <if_sid>100520</if_sid>
+    <field name="file">^/opt/triage/deploy/control/SAFE_MODE$</field>
+    <description>Triage kill switch (SAFE_MODE) changed: $(file)</description>
+  </rule>
+
+</group>

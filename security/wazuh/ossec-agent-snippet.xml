@@ -1,0 +1,23 @@
+<!--
+  Add to /var/ossec/etc/ossec.conf on the AGENT running the triage container,
+  then restart the agent:  sudo systemctl restart wazuh-agent
+  Assumes the repo is cloned to /opt/triage. Adjust paths if not.
+-->
+<ossec_config>
+
+  <!-- Collect the triage service's JSON security events -->
+  <localfile>
+    <log_format>json</log_format>
+    <location>/opt/triage/deploy/logs/security.json</location>
+  </localfile>
+
+  <!-- Detect tampering with code, deployment config, and the kill switch.
+       report_changes is enabled ONLY for code: the deploy directory holds
+       .env with secrets, whose contents must never be copied into Wazuh. -->
+  <syscheck>
+    <directories realtime="yes" check_all="yes" report_changes="yes">/opt/triage/triage-service</directories>
+    <directories realtime="yes" check_all="yes">/opt/triage/deploy</directories>
+    <ignore>/opt/triage/deploy/logs</ignore>
+  </syscheck>
+
+</ossec_config>

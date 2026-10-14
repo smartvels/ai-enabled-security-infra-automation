@@ -1,0 +1,11 @@
+# This is an EXAMPLE only, showing the pattern -- never commit an
+# unencrypted vault file with real credentials.
+#
+# To create the real, encrypted version:
+#   ansible-vault create group_vars/all/vault.yml --vault-password-file ~/.vault_pass.txt
+#
+# Example structure once populated with real (test) values:
+vault_firewall_admin_user: "admin"
+vault_firewall_admin_password: "REPLACE_WITH_REAL_SECRET"
+vault_ad_admin_user: "svc-ansible"
+vault_ad_admin_password: "REPLACE_WITH_REAL_SECRET"

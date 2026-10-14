@@ -1,0 +1,48 @@
+# Hardened runtime for the triage service.
+#
+# Usage (from this directory):
+#   cp env.example .env        # then fill in real values; .env is git-ignored
+#   mkdir -p control logs
+#   docker compose up -d --build
+#
+# Kill switch (instant, no restart):   touch control/SAFE_MODE
+# Back to normal:                       rm control/SAFE_MODE
+
+services:
+  triage:
+    build: ../triage-service
+    image: triage-service:local
+    container_name: triage
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SAFE_MODE_FILE: /control/SAFE_MODE
+      SECURITY_LOG_PATH: /logs/security.json
+    # Reachable only from this host; put a TLS reverse proxy in front to expose it
+    ports:
+      - "127.0.0.1:5050:5050"
+    volumes:
+      - ./control:/control:ro        # kill-switch flag (container can read, never write)
+      - ./logs:/logs                 # JSON security events for the Wazuh agent
+    # --- runtime hardening ---
+    read_only: true                  # immutable root filesystem
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid
+    cap_drop:
+      - ALL                          # no Linux capabilities at all
+    security_opt:
+      - no-new-privileges:true       # blocks setuid privilege escalation
+    pids_limit: 100                  # fork-bomb protection
+    mem_limit: 256m
+    cpus: 0.5
+    networks:
+      - triage-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  triage-net:
+    driver: bridge

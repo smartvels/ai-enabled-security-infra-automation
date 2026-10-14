@@ -1,0 +1,140 @@
+{
+  "name": "RAG - Document Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ingest-document",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "2b222222-2222-4222-8222-222222222201",
+      "name": "Ingest Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1180, 300],
+      "webhookId": "ingest-document"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Split incoming text into overlapping chunks.\n// Expects: { source_name: string, text: string }\n\nconst input = items[0].json;\nconst text = input.text;\nconst sourceName = input.source_name;\n\nif (!text || !sourceName) {\n  throw new Error('Expected { source_name, text } in the request body');\n}\n\nconst chunkSize = 500;\nconst overlap = 50;\nconst chunks = [];\n\nlet start = 0;\nwhile (start < text.length) {\n  const end = Math.min(start + chunkSize, text.length);\n  chunks.push(text.slice(start, end));\n  if (end === text.length) break;\n  start += chunkSize - overlap;\n}\n\nreturn chunks.map((chunk) => ({\n  json: {\n    source_name: sourceName,\n    chunk_text: chunk\n  }\n}));"
+      },
+      "id": "2b222222-2222-4222-8222-222222222202",
+      "name": "Chunk Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-960, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://${LOCALAI_HOST}:8080/v1/embeddings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'all-MiniLM-L6-v2-Q4_0.gguf', input: $json.chunk_text }) }}",
+        "options": {}
+      },
+      "id": "2b222222-2222-4222-8222-222222222203",
+      "name": "Get Embedding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-740, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Build a parameterised-safe INSERT statement.\n// Single quotes are escaped by doubling them (standard SQL literal escaping)\n// rather than relying on string templating that could corrupt the query --\n// same principle as the JSON-body lesson from the triage workflow.\n\nconst embeddingResponse = item.json;\nconst embeddingArray = embeddingResponse.data[0].embedding;\nconst embeddingStr = '[' + embeddingArray.join(',') + ']';\n\nconst chunkData = $('Chunk Text').item.json;\n\nconst escapedSource = chunkData.source_name.replace(/'/g, \"''\");\nconst escapedChunk = chunkData.chunk_text.replace(/'/g, \"''\");\n\nconst sql = \"INSERT INTO documents (source_name, chunk_text, embedding) VALUES ('\" +\n  escapedSource + \"', '\" + escapedChunk + \"', '\" + embeddingStr + \"'::vector)\";\n\nreturn { json: { sql } };"
+      },
+      "id": "2b222222-2222-4222-8222-222222222204",
+      "name": "Build Insert SQL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-520, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql }}",
+        "options": {}
+      },
+      "id": "2b222222-2222-4222-8222-222222222205",
+      "name": "Insert Into pgvector",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [-300, 300],
+      "credentials": {
+        "postgres": {
+          "id": "PLACEHOLDER_SET_AFTER_IMPORT",
+          "name": "pgvector"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{ json: { status: 'ingested', chunks_stored: items.length } }];"
+      },
+      "id": "2b222222-2222-4222-8222-222222222206",
+      "name": "Summarize Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-80, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "2b222222-2222-4222-8222-222222222207",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [140, 300]
+    }
+  ],
+  "connections": {
+    "Ingest Webhook": {
+      "main": [
+        [ { "node": "Chunk Text", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Chunk Text": {
+      "main": [
+        [ { "node": "Get Embedding", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Get Embedding": {
+      "main": [
+        [ { "node": "Build Insert SQL", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Build Insert SQL": {
+      "main": [
+        [ { "node": "Insert Into pgvector", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Insert Into pgvector": {
+      "main": [
+        [ { "node": "Summarize Results", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Summarize Results": {
+      "main": [
+        [ { "node": "Respond", "type": "main", "index": 0 } ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

@@ -1,0 +1,19 @@
+# Copy to /var/ossec/etc/pan-block.conf on the Wazuh manager (root:wazuh, 640).
+
+[panos]
+# Firewall management address (hostname or IP, optional :port)
+host = firewall.example.local
+# API key of a dedicated, least-privilege admin role that can only use the
+# User-ID API. Generate it on the firewall; never reuse a full admin key.
+api_key = <paste-api-key>
+# Tag matched by the Dynamic Address Group used in the block rule
+tag = wazuh-block
+# Block duration; PAN-OS removes the tag automatically afterwards
+timeout_seconds = 3600
+# Optional: CA certificate if the management interface uses a private CA
+ca_file =
+
+[allowlist]
+# Comma-separated IPs/CIDRs that must NEVER be blocked: office gateways,
+# management subnets, Wazuh/n8n hosts, VPN pools.
+networks = 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12

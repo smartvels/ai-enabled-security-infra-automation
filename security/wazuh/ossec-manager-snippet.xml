@@ -1,0 +1,58 @@
+<!--
+  Add to /var/ossec/etc/ossec.conf on the Wazuh MANAGER, edit the allowlist,
+  then restart the manager:  sudo systemctl restart wazuh-manager
+
+  Graduated response:
+    - brute force (100502) / honeytoken (100503): block the source IP for 1 hour
+      on the host (firewall-drop) and on the Palo Alto (tag with timeout)
+    - repeated injection (100505) / tampering (100520): turn on the kill switch
+  Permanent blocks are a human decision (see docs/INCIDENT-RESPONSE.md).
+-->
+<ossec_config>
+
+  <!-- NEVER block these. Include office gateways, management hosts, the
+       Docker bridge range, and the n8n host. CIDR notation is accepted. -->
+  <global>
+    <white_list>127.0.0.1</white_list>
+    <white_list>172.16.0.0/12</white_list>
+    <white_list>OFFICE-GATEWAY-IP</white_list>
+    <white_list>N8N-HOST-IP</white_list>
+  </global>
+
+  <command>
+    <name>pan-block-ip</name>
+    <executable>pan-block-ip.py</executable>
+    <!-- PAN-OS expires the tag itself, so no Wazuh-side timeout -->
+    <timeout_allowed>no</timeout_allowed>
+  </command>
+
+  <command>
+    <name>triage-safe-mode</name>
+    <executable>triage-safe-mode.sh</executable>
+    <!-- Turning safe mode off is a human decision -->
+    <timeout_allowed>no</timeout_allowed>
+  </command>
+
+  <!-- Host-level block on the agent (built-in firewall-drop command) -->
+  <active-response>
+    <command>firewall-drop</command>
+    <location>local</location>
+    <rules_id>100502,100503</rules_id>
+    <timeout>3600</timeout>
+  </active-response>
+
+  <!-- Perimeter block on the Palo Alto, executed on the manager -->
+  <active-response>
+    <command>pan-block-ip</command>
+    <location>server</location>
+    <rules_id>100502,100503</rules_id>
+  </active-response>
+
+  <!-- Automatic kill switch on the agent running the triage container -->
+  <active-response>
+    <command>triage-safe-mode</command>
+    <location>local</location>
+    <rules_id>100505,100520</rules_id>
+  </active-response>
+
+</ossec_config>
