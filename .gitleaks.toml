@@ -1,0 +1,22 @@
+# Gitleaks configuration: the built-in rules plus a rule for passwords
+# written directly into code. The built-in rules look for high-entropy
+# secrets and known key formats, so a short human-chosen password assigned
+# to a variable can slip through; this rule closes that gap.
+title = "repo gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "hardcoded-password-assignment"
+description = "Password assigned as a string literal in code"
+regex = '''(?i)\b[a-z0-9_]*(pass|passwd|password|pwd)[a-z0-9_]*["']?\s*[:=]\s*["']([^"'\s$<{]{6,})["']'''
+secretGroup = 2
+keywords = ["pass", "pwd"]
+
+[allowlist]
+description = "Test fixtures and example files"
+paths = [
+  '''(^|/)tests?/''',
+  '''\.example$''',
+]
