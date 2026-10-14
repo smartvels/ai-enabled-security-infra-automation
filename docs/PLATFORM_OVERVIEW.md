@@ -30,27 +30,34 @@ in-house rather than bought as a commercial suite.
 
 ## How this repo fits in
 
-This repo is the **automation and AI layer** specifically: it does not
-include dashboard, endpoint agent, DLP, or remote-access source (those
-are separate components in the reference architecture, described here
-for context only). What this repo contains:
+This repo contains the automation and AI layer, the IT operations portal
+(backend and dashboard), and the detection and response pack. Endpoint
+agent binaries and the remote-access relay setup are not included.
 
-- SIEM alert -> LLM triage -> ticketing automation pipeline
+- SIEM alert -> LLM triage -> ticketing automation pipeline (n8n)
 - Vector-store-backed RAG ingestion and retrieval pipeline
-- A standalone Python triage service (reference/fallback implementation)
+- A standalone, hardened Python triage service (containerised)
+- The IT operations portal (`it-assistant-portal/`): endpoints, ITSM, DLP,
+  vulnerability scanning, monitoring views
+- Detection and automated response (`security/`): Wazuh rules, kill
+  switch, firewall IP blocking
+- Ansible project skeleton with Vault-encrypted secrets
 
 ## Functional pillars and where each is handled
 
 | Pillar | Typically handled by | In this repo? |
 |---|---|---|
-| Asset management | Ticketing/ITSM tool | No — external tool |
-| Incident management | Case management + ticketing | Partial — ticket creation; case-management integration is a natural extension |
-| Change management | ITSM tool | Not yet — planned, same orchestration pattern |
-| SOC automation | SIEM + orchestration + LLM | **Yes** — this repo's core pipeline |
-| Endpoint control / DLP | Endpoint agent | No — separate component |
-| Remote access | Self-hosted relay | No — separate component |
-| Auto-block IPs | SIEM active response + firewall API | Not yet — planned extension |
-| Knowledge / RAG | Vector DB + LLM + orchestration | **Yes** — this repo's RAG pipeline |
+| Asset management | Endpoint agent + inventory | **Yes** — server side in `it-assistant-portal/` (agent not included) |
+| Incident management | Case management + ticketing | **Yes** — ticket creation and incident tracking |
+| Change management | ITSM workflow | **Yes** — approve / reject / execute workflow in the portal |
+| SOC automation | SIEM + orchestration + LLM | **Yes** — the core triage pipeline |
+| Endpoint control / DLP | Endpoint agent | **Yes** — server side in the portal (agent not included) |
+| Remote access | Self-hosted relay | Partial — the portal links to a self-hosted relay; relay setup not included |
+| Auto-block IPs | SIEM active response + firewall API | **Yes** — `security/` (Wazuh rules, Palo Alto blocking) |
+| Knowledge / RAG | Vector DB + LLM + orchestration | **Yes** — the RAG pipeline |
+
+All of the above was piloted as a proof of concept on 10 endpoints; none
+of it is currently running in production.
 
 ## Core technology stack (reference platform)
 
