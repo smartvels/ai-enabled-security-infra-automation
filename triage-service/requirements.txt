@@ -1,7 +1,7 @@
 # Direct dependencies
 flask==3.1.3
-requests==2.33.0
-gunicorn==23.0.0
+requests==2.34.2
+gunicorn==26.2.0
 # Transitive dependencies, pinned so every build installs exactly the same
 # versions (taken from the build's SBOM). Update deliberately, then re-run CI.
 blinker==1.9.0
