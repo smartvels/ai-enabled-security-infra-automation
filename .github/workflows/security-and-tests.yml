@@ -206,14 +206,14 @@ jobs:
           push-to-registry: true
 
       - name: Verify signature, SBOM attestation, and provenance
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REF="${{ steps.push.outputs.ref }}"
           cosign verify "$REF" --certificate-identity "$SIGNER" --certificate-oidc-issuer "$OIDC_ISSUER" > /dev/null
           cosign verify-attestation "$REF" --type cyclonedx \
             --certificate-identity "$SIGNER" --certificate-oidc-issuer "$OIDC_ISSUER" > /dev/null
-          gh attestation verify "oci://$REF" --owner "${{ github.repository_owner }}"
+          # Provenance verified with cosign as well (one tool, one trust root)
+          cosign verify-attestation "$REF" --type slsaprovenance1 \
+            --certificate-identity "$SIGNER" --certificate-oidc-issuer "$OIDC_ISSUER" > /dev/null
           echo "Signature, SBOM attestation, and provenance verified"
 
       - name: "Tamper tests: untrusted images must be REJECTED"
