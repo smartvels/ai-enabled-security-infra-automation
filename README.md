@@ -1,6 +1,8 @@
 # SOC Alert Triage & RAG Automation (Reference Architecture)
 
 [![Security scan and tests](https://github.com/smartvels/ai-enabled-security-infra-automation/actions/workflows/security-and-tests.yml/badge.svg)](https://github.com/smartvels/ai-enabled-security-infra-automation/actions/workflows/security-and-tests.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/smartvels/ai-enabled-security-infra-automation/badge)](https://scorecard.dev/viewer/?uri=github.com/smartvels/ai-enabled-security-infra-automation)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 A reference implementation of an LLM-assisted SOC (Security Operations
 Center) automation pipeline, built with self-hosted, open-source
@@ -206,4 +208,4 @@ network unless you deliberately expose it.
 
 ## License
 
-MIT -- use freely, adapt to your own environment.
+Apache License 2.0 (see [LICENSE](LICENSE) and [NOTICE](NOTICE)). Security issues: see [SECURITY.md](SECURITY.md).
