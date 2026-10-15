@@ -43,9 +43,11 @@ flowchart LR
 REF=ghcr.io/smartvels/triage-service@sha256:<digest>
 SIGNER=https://github.com/smartvels/ai-enabled-security-infra-automation/.github/workflows/security-and-tests.yml@refs/heads/main
 
-cosign verify "$REF" --certificate-identity "$SIGNER" \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com
-gh attestation verify "oci://$REF" --owner smartvels
+ISSUER=https://token.actions.githubusercontent.com
+
+cosign verify "$REF" --certificate-identity "$SIGNER" --certificate-oidc-issuer "$ISSUER"
+cosign verify-attestation "$REF" --type slsaprovenance1 \
+  --certificate-identity "$SIGNER" --certificate-oidc-issuer "$ISSUER"
 ```
 
 Or simply: `deploy/verify-image.sh "$REF"`.
