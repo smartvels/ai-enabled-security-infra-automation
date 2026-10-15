@@ -11,7 +11,9 @@
 services:
   triage:
     build: ../triage-service
-    image: triage-service:local
+    # Local builds use triage-service:local. For a release, set TRIAGE_IMAGE to a
+    # verified digest (see verify-image.sh) and run: docker compose up -d --no-build
+    image: ${TRIAGE_IMAGE:-triage-service:local}
     container_name: triage
     restart: unless-stopped
     env_file: .env

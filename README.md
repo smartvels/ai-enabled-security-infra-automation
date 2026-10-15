@@ -1,5 +1,7 @@
 # SOC Alert Triage & RAG Automation (Reference Architecture)
 
+[![Security scan and tests](https://github.com/smartvels/ai-enabled-security-infra-automation/actions/workflows/security-and-tests.yml/badge.svg)](https://github.com/smartvels/ai-enabled-security-infra-automation/actions/workflows/security-and-tests.yml)
+
 A reference implementation of an LLM-assisted SOC (Security Operations
 Center) automation pipeline, built with self-hosted, open-source
 components end to end -- no data leaves the local network.
@@ -81,7 +83,8 @@ the feature is not included in this repo.
 - **CI enforces security scanning on every change** (SAST via Bandit,
   secrets scanning via Gitleaks, dependency auditing via pip-audit,
   Dockerfile misconfiguration and container image scanning via Trivy,
-  and a CycloneDX SBOM generated for every build)
+  a CycloneDX SBOM for every build, OPA policy checks, and signed,
+  provenance-attested images on main)
   before anything merges.
 
 ## Defence in depth
@@ -91,7 +94,35 @@ the feature is not included in this repo.
 | **Prevent** | Token auth, input fencing, server-side default-deny access control on the portal, hardened non-root read-only container, CI security gates |
 | **Detect** | JSON security events and File Integrity Monitoring into Wazuh, custom detection rules |
 | **Respond** | Instant kill switch, automatic IP blocking on host and Palo Alto, honeytoken |
+| **Supply chain** | Signed images (Cosign), SLSA build provenance, SBOM attestations, OPA policy, tamper tests, deployment gate |
 | **Recover** | Rebuild from Git, incident response playbook with CERT-In reporting |
+
+### Architecture
+
+```mermaid
+flowchart LR
+  subgraph Sources
+    EP[Endpoints, servers,<br/>firewalls, M365]
+  end
+  subgraph Detect
+    WZ[Wazuh SIEM<br/>rules + FIM]
+  end
+  subgraph Decide["AI triage (advisory)"]
+    N8N[n8n] --> LLM[Self-hosted LLM<br/>prompt-injection guarded]
+    N8N --> TI[Threat intel<br/>AbuseIPDB, VirusTotal]
+  end
+  subgraph Respond
+    TK[Ticket in service desk]
+    AR[Active response<br/>IP block: host + Palo Alto]
+    KS[Kill switch<br/>safe mode]
+  end
+  EP --> WZ --> N8N
+  N8N -->|fail-safe: always ticket on doubt| TK
+  WZ --> AR
+  WZ --> KS
+```
+
+Software supply chain: see **[docs/SUPPLY-CHAIN.md](docs/SUPPLY-CHAIN.md)**.
 
 Start here: **[docs/SECURITY-ROLLOUT-GUIDE.md](docs/SECURITY-ROLLOUT-GUIDE.md)** (step by step)
 and **[docs/INCIDENT-RESPONSE.md](docs/INCIDENT-RESPONSE.md)** (playbook).
@@ -115,6 +146,7 @@ it-assistant-portal/   FastAPI + HTML/JS IT operations portal (AI chat, endpoint
 ansible-automation/    Ansible project skeleton with Vault-encrypted secrets pattern
 deploy/                Hardened docker-compose runtime (read-only, no capabilities, kill switch)
 security/              Wazuh detection rules, FIM config, active-response scripts (Palo Alto block, kill switch)
+policy/                OPA/Conftest policies for Dockerfiles and compose files, with unit tests and insecure fixtures
 .github/workflows/     CI: secrets, SAST, dependency, container scanning, SBOM, unit tests
 docs/                  Design notes, AI security design, lessons learned
 ```
