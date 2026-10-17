@@ -35,7 +35,9 @@ must never be able to make a real alert disappear.
 | **LLM05 Improper Output Handling** | Model output is strictly validated: verdict must be one of two values, confidence a number 0–100, reason a string (truncated). Anything else is treated as invalid. | `parse_verdict` / *Parse Verdict* |
 | **LLM05 Improper Output Handling** | The source IP in the ticket comes from Wazuh, never from the model, so a manipulated answer cannot redirect investigation or (if later connected) automated blocking. | `decide` / *Build GLPI Ticket* |
 | **Availability / fail-open** | Fail-safe: LLM timeout, outage, or unparseable output results in a ticket (`llm_output_invalid`), never a silently dropped alert. | `handle_alert` / *Call LocalAI* set to continue on error |
-| **LLM02 Sensitive Information Disclosure** | Self-hosted model (LocalAI): alert data, IPs, and usernames never leave the local network. | Architecture |
+| **LLM02 Sensitive Information Disclosure** | Self-hosted model (LocalAI): alert data, IPs, and usernames never leave the local network. Threat-intel lookups send **only public source IPs**; internal addresses are never sent to providers. | Architecture, `threat_intel.py` / *Prepare Enrichment* |
+| **LLM01 Prompt Injection** (via threat-intel data) | Provider responses are reduced to numbers and fixed-format codes; free text (ISP, domain, WHOIS), which an attacker can control, is dropped before reaching the model. | `threat_intel.py` / *Summarize Threat Intel* |
+| **Deterministic override** | A known-malicious source IP (AbuseIPDB confidence ≥ 75 or ≥ 3 VirusTotal engines) forces a ticket regardless of the model's verdict. | `decide` / *Parse Verdict* |
 | **LLM06 Excessive Agency** | The model has no tools and cannot act: it returns a verdict only. Ticket creation is done by deterministic code. | Architecture |
 | **LLM03 Supply Chain** | Pinned dependencies, `pip-audit` on every push, Trivy scanning of the container image, and a CycloneDX SBOM per build; models pulled from official sources. | CI, `requirements.txt`, `Dockerfile` |
 | **LLM10 Unbounded Consumption** | Input length caps and a 60-second request timeout. | `extract_fields`, HTTP timeout |
@@ -58,7 +60,7 @@ The service also defends itself at runtime (full procedures in
 | **Injection short-circuit** | Alerts containing instruction-like text skip the LLM entirely and are ticketed as `injection_suspected`. |
 | **Deception** | A honeytoken (decoy API token) planted where an intruder would look; any use is a confirmed intrusion. |
 | **Security telemetry** | JSON security events (auth failures, honeytoken use, injection markers, LLM outages, oversized payloads) collected by the Wazuh agent; File Integrity Monitoring on code, deployment config, and the kill switch. |
-| **Detection rules** | Custom Wazuh rules 100500-100521: brute force, honeytoken use, repeated injection, sustained LLM outage, tampering. |
+| **Detection rules** | Custom Wazuh rules 100500-100521: brute force, honeytoken use, repeated injection, sustained LLM outage, known-malicious source (threat intel), tampering. |
 | **Automatic response** | Brute force or honeytoken use: source IP blocked for 1 hour on the host and on the Palo Alto (Dynamic Address Group via the User-ID API). Repeated injection or tampering: kill switch turned on. Allowlist prevents self-lockout. |
 | **Hardened runtime** | Non-root user, read-only root filesystem, all Linux capabilities dropped, no privilege escalation, resource limits, localhost-only port. |
 
@@ -71,6 +73,7 @@ The service also defends itself at runtime (full procedures in
 | Model says true positive | Yes | `llm_true_positive` |
 | Model says false positive with confidence < `MIN_FP_CONFIDENCE` | Yes | `low_confidence_false_positive` |
 | Low severity, model confidently says false positive | No | `llm_false_positive` |
+| Source IP known-malicious (threat intel) | Yes | `threat_intel_malicious` |
 | Kill switch on | Yes | `safe_mode` |
 | Instruction-like text in alert data | Yes | `injection_suspected` |
 

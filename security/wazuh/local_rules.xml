@@ -73,6 +73,16 @@
     <description>Triage API: oversized payload rejected from $(srcip)</description>
   </rule>
 
+  <!-- Threat intelligence -->
+  <rule id="100509" level="10">
+    <if_sid>100500</if_sid>
+    <field name="triage_event">^threat_intel_malicious$</field>
+    <description>Triage: alert source $(ioc_ip) is known-malicious per threat intelligence ($(detail))</description>
+    <mitre>
+      <id>T1595</id>
+    </mitre>
+  </rule>
+
   <!-- Tampering (File Integrity Monitoring) -->
   <rule id="100520" level="12">
     <if_sid>550,553,554</if_sid>
