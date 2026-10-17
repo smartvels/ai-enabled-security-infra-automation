@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.1.0 (2026-10)
+
+### Threat intelligence enrichment
+- AbuseIPDB and VirusTotal lookups for alert source IPs, in both the n8n workflow and the Python service
+- Privacy: only public IPs are looked up; internal addresses never leave the network
+- Provider text dropped (prompt-injection defence); outages fail safe; bounded TTL cache
+- Known-malicious sources force a ticket regardless of the model's verdict
+- New Wazuh rule 100509 for known-malicious sources; reputation included in tickets
+- Fix: n8n workflow now reads the alert from the webhook body
+
 ## v1.0.0 (2026-10)
 
 First stable release of the sanitized reference platform.

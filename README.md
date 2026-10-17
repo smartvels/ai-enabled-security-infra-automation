@@ -20,13 +20,15 @@ SIEM alert (e.g. Wazuh)
    |  webhook
    v
 n8n workflow
-   |  builds a classification prompt
+   |  public source IP? -> threat intel lookup (AbuseIPDB, VirusTotal)
+   |  (internal IPs are never sent out; outages fail safe)
+   |  builds a classification prompt (alert + reputation, fenced as data)
    v
 Self-hosted LLM (e.g. LocalAI + Qwen2.5)
    |  returns { verdict, confidence, reason } (strictly validated)
    v
 Fail-safe decision (LLM is advisory only):
-   high severity, invalid output, LLM down,
+   known-malicious source IP, high severity, invalid output, LLM down,
    true_positive, or low-confidence FP   -> ticket in a service desk (e.g. GLPI)
    confident FP on a low-severity alert  -> logged, no action taken
 ```
@@ -202,7 +204,11 @@ network unless you deliberately expose it.
    N8N_BLOCK_ENV_ACCESS_IN_NODE=false
    ```
 3. Create a Postgres credential in n8n pointing at your pgvector instance
-4. Replace the `${LOCALAI_HOST}`, `${GLPI_HOST}`, `${PGVECTOR_HOST}`
+4. For threat intelligence, create two **Header Auth** credentials and select
+   them in the lookup nodes: `Key: <AbuseIPDB key>` for *AbuseIPDB Lookup*
+   and `x-apikey: <VirusTotal key>` for *VirusTotal Lookup*. Keys stay in
+   n8n's encrypted credential store, never in the workflow JSON.
+5. Replace the `${LOCALAI_HOST}`, `${GLPI_HOST}`, `${PGVECTOR_HOST}`
    placeholders in the workflow JSON with your actual hosts (or convert
    them to n8n environment expressions)
 
