@@ -239,3 +239,36 @@ def test_security_event_is_valid_json_with_srcip(capsys, monkeypatch):
     assert rec["triage_event"] == "auth_failure"
     assert rec["srcip"] == "198.51.100.7"
     assert rec["service"] == "triage"
+
+
+# --- Threat intelligence in the decision path ------------------------------
+
+MALICIOUS_INTEL = {"status": "ok", "ip": "198.51.100.77", "malicious": True,
+                   "reasons": ["AbuseIPDB confidence 100%"], "sources": {}}
+
+
+def test_malicious_threat_intel_forces_ticket_even_if_llm_says_benign():
+    r = decide(_alert(level=3), FP_SURE, intel=MALICIOUS_INTEL)
+    assert r["create_ticket"] is True
+    assert r["decision"] == "threat_intel_malicious"
+
+
+@patch("triage.requests.post")
+def test_endpoint_includes_threat_intel_and_overrides_llm(mock_post, monkeypatch):
+    monkeypatch.setattr(triage.threat_intel, "enrich_ip", lambda ip: MALICIOUS_INTEL)
+    events = []
+    monkeypatch.setattr(triage, "security_event", lambda e, *a, **k: events.append(e))
+    mock_post.return_value = _mock_localai_response(
+        '{"verdict":"false_positive","confidence":99,"reason":"benign"}'
+    )
+    body = _post(_alert(level=3)).get_json()
+    assert body["decision"] == "threat_intel_malicious"
+    assert body["threat_intel"]["malicious"] is True
+    assert "threat_intel_malicious" in events
+
+
+def test_threat_intel_reaches_prompt_inside_the_fence():
+    msgs = build_messages(_alert(), {"status": "ok", "malicious": False,
+                                     "sources": {"abuseipdb": {"status": "ok", "abuse_confidence": 5}}})
+    user = msgs[1]["content"]
+    assert '"threat_intel"' in user and user.endswith("</alert_data>")

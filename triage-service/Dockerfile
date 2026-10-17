@@ -19,7 +19,7 @@ RUN groupadd --system --gid 10001 app \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY triage.py .
+COPY triage.py threat_intel.py ./
 
 USER app
 
