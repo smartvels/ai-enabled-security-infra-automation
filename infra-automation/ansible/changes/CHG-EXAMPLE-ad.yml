@@ -1,0 +1,9 @@
+# Example guarded AD change for tools/ad_change.py (names are placeholders). Nothing is ever deleted.
+id: CHG-EXAMPLE-AD1
+dc: dc-site-a
+reason: "Privileged access clean-up: empty standing Schema/Enterprise Admin rights; disable dormant privileged accounts"
+operations:
+  - { op: remove_member, group: "Schema Admins",     member: "Example User" }
+  - { op: remove_member, group: "Enterprise Admins", member: "Example User" }
+  - { op: disable_user,  user: "svc-legacy-app",     note: "dormant privileged account, review 30d" }
+  - { op: info,          user: "shared-it-account" }

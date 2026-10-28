@@ -1,0 +1,81 @@
+# wazuh-agent-rename.yml - re-enroll agents under their standard names (wazuh_agent_name), then remove the
+# old alias-named registrations on the manager. Collected logs/alerts are kept.
+#   ansible-playbook playbooks/wazuh-agent-rename.yml -e target=hv-a2          # pilot
+#   ansible-playbook playbooks/wazuh-agent-rename.yml -e target='pve:pbs'      # all
+- name: Enrollment password from the master
+  hosts: wazuh-01
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.slurp: { src: /var/ossec/etc/authd.pass }
+      register: authd
+      no_log: true
+
+- name: Re-enroll under the standard name
+  hosts: "{{ target }}"
+  become: true
+  gather_facts: false
+  vars:
+    new_name: "{{ wazuh_agent_name | default(pbs_ns | default(inventory_hostname)) }}"
+  tasks:
+    - name: Current registered name on this agent
+      ansible.builtin.shell: awk '{print $2}' /var/ossec/etc/client.keys 2>/dev/null | head -1
+      register: oldname
+      changed_when: false
+
+    - name: Skip if already enrolled under the standard name
+      ansible.builtin.meta: end_host
+      when: oldname.stdout | trim == new_name
+
+    - name: Stop agent, set the new name, clear the old key
+      ansible.builtin.shell: |
+        set -e
+        systemctl stop wazuh-agent
+        cp -a /var/ossec/etc/ossec.conf /var/ossec/etc/ossec.conf.pre-rename
+        if grep -q '<agent_name>' /var/ossec/etc/ossec.conf; then
+          sed -i "s|<agent_name>.*</agent_name>|<agent_name>{{ new_name }}</agent_name>|" /var/ossec/etc/ossec.conf
+        else
+          sed -i "0,/<enrollment>/s|<enrollment>|<enrollment>\n      <agent_name>{{ new_name }}</agent_name>|" /var/ossec/etc/ossec.conf
+        fi
+        : > /var/ossec/etc/client.keys
+        grep -c "<agent_name>{{ new_name }}</agent_name>" /var/ossec/etc/ossec.conf
+
+    - name: Enrollment password (used once)
+      ansible.builtin.copy:
+        dest: /var/ossec/etc/authd.pass
+        content: "{{ hostvars['wazuh-01'].authd.content | b64decode | trim }}\n"
+        owner: root
+        group: wazuh
+        mode: "0640"
+      no_log: true
+
+    - name: Start and wait for connection, then remove the password file
+      ansible.builtin.shell: |
+        systemctl start wazuh-agent
+        for i in $(seq 1 30); do grep -q "Connected to the server" /var/ossec/logs/ossec.log && break; sleep 2; done
+        shred -u /var/ossec/etc/authd.pass 2>/dev/null || true
+        echo "now: $(awk '{print $2}' /var/ossec/etc/client.keys | head -1)"
+      register: res
+    - ansible.builtin.debug: { msg: "{{ inventory_hostname }}: {{ oldname.stdout | trim }} -> {{ res.stdout }}" }
+
+    - ansible.builtin.set_fact:
+        renamed_from: "{{ oldname.stdout | trim }}"
+
+- name: Remove the old registrations on the manager
+  hosts: wazuh-01
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Old names to remove (only those that were renamed in this run)
+      ansible.builtin.set_fact:
+        old_names: "{{ groups['all'] | map('extract', hostvars) | selectattr('renamed_from', 'defined') | map(attribute='renamed_from') | select | list }}"
+    - name: Remove old agent IDs
+      ansible.builtin.shell: |
+        for n in {{ old_names | join(' ') }}; do
+          id=$(/var/ossec/bin/manage_agents -l | awk -v n="$n" -F', ' '$2=="Name: "n {sub("ID: ","",$1); gsub(/ /,"",$1); print $1}')
+          [ -n "$id" ] && /var/ossec/bin/manage_agents -r "$id" >/dev/null && echo "removed $n ($id)"
+        done
+      register: rm
+      when: old_names | length > 0
+    - ansible.builtin.debug: { var: rm.stdout_lines }
+      when: old_names | length > 0

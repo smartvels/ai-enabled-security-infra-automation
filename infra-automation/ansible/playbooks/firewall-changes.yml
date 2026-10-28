@@ -1,0 +1,71 @@
+# firewall-changes.yml - READ-ONLY: turn every Palo Alto configuration change into a change record.
+#   ansible-playbook playbooks/firewall-changes.yml              # last 26 h (nightly, after pan-backup)
+#   ansible-playbook playbooks/firewall-changes.yml -e hours=720  # backfill 30 days
+# Source: the firewall's own config log (admin, client, command, path, result) + commit descriptions.
+# Output: ~/infra/docs/changes/firewall/<YYYY-MM>.csv (deduplicated) + journald tag firewall-change (-> Wazuh)
+- name: Read config logs
+  hosts: firewalls
+  gather_facts: false
+  connection: local
+  vars:
+    hours: 26
+  tasks:
+    - ansible.builtin.meta: end_host
+      when: pan_api_key is not defined
+    - ansible.builtin.shell: |
+        C="curl -sS -k --max-time 60 --pinnedpubkey {{ pan_pin }} -H X-PAN-KEY:$PANKEY"
+        Q="(receive_time geq '$(date -d '-{{ hours }} hours' '+%Y/%m/%d %H:%M:%S')')"
+        J=$($C -G "https://{{ ansible_host }}/api/" --data-urlencode type=log --data-urlencode log-type=config --data-urlencode nlogs=1000 --data-urlencode "query=$Q" | sed -n 's:.*<job>\([0-9]*\)</job>.*:\1:p')
+        [ -n "$J" ] || { echo "[]"; exit 0; }
+        for i in 1 2 3 4 5 6; do sleep 5; R=$($C "https://{{ ansible_host }}/api/?type=log&action=get&job-id=$J"); echo "$R" | grep -q '<status>FIN</status>' && break; done
+        echo "$R" | python3 -c '
+        import sys, json, xml.etree.ElementTree as ET
+        out = []
+        for e in ET.parse(sys.stdin).getroot().iter("entry"):
+            g = lambda k: (e.findtext(k) or "").strip()
+            if not g("time_generated"): continue
+            out.append({"time": g("time_generated"), "admin": g("admin"), "client": g("client") or g("host"), "cmd": g("cmd"),
+                        "path": g("path")[:200], "result": g("result"), "detail": (g("after-change-detail") or g("full-path"))[:200]})
+        print(json.dumps(out))'
+      environment: { PANKEY: "{{ pan_api_key }}" }
+      register: cl
+      no_log: true
+      changed_when: false
+    - ansible.builtin.set_fact:
+        cfg_changes: "{{ cl.stdout | from_json }}"
+
+- name: Write the change register
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - ansible.builtin.copy:
+        dest: /tmp/fw-changes.json
+        mode: "0600"
+        content: "{{ dict(groups['firewalls'] | map('extract', hostvars) | selectattr('cfg_changes', 'defined') | map(attribute='inventory_hostname') | zip(groups['firewalls'] | map('extract', hostvars) | selectattr('cfg_changes', 'defined') | map(attribute='cfg_changes'))) | to_json }}"
+    - ansible.builtin.shell: |
+        python3 - <<'PY'
+        import csv, json, os, subprocess
+        data = json.load(open('/tmp/fw-changes.json')); os.remove('/tmp/fw-changes.json')
+        base = os.path.expanduser('~/infra/docs/changes/firewall'); os.makedirs(base, exist_ok=True)
+        added, commits = 0, 0
+        for fw, rows in data.items():
+            for r in rows:
+                if not r['cmd'] or r['admin'] == 'svc-ctl01-ro':   # our read-only account never changes anything
+                    continue
+                f = os.path.join(base, r['time'][:7].replace('/', '-') + '.csv')
+                seen = {(x[1], x[2], x[5], x[6]) for x in csv.reader(open(f))} if os.path.exists(f) else set()
+                key = (fw, r['time'], r['cmd'], r['path'])
+                if key in seen: continue
+                new = not os.path.exists(f)
+                with open(f, 'a', newline='') as fh:
+                    w = csv.writer(fh)
+                    if new: w.writerow(['type', 'firewall', 'time', 'admin', 'client', 'command', 'path', 'result', 'detail'])
+                    w.writerow(['firewall-change', fw, r['time'], r['admin'], r['client'], r['cmd'], r['path'], r['result'], r['detail']])
+                added += 1
+                if r['cmd'] == 'commit': commits += 1
+                subprocess.run(['logger', '-t', 'firewall-change', '%s %s by %s from %s: %s %s (%s)' % (fw, r['time'], r['admin'], r['client'], r['cmd'], r['path'][:80], r['result'])])
+        print('firewall change records added: %d (commits: %d)' % (added, commits))
+        PY
+      register: w
+    - ansible.builtin.debug: { var: w.stdout_lines }

@@ -1,0 +1,9 @@
+[Unit]
+Description=Package change register
+Wants=network-online.target
+After=network-online.target
+[Service]
+Type=oneshot
+User=opsadmin
+Environment=PATH=/home/opsadmin/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/opsadmin/infra/tools/package-changes-auto.sh

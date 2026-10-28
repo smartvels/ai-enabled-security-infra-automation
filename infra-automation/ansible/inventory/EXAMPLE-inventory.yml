@@ -1,0 +1,19 @@
+# Example inventory layout (all values are placeholders). Real inventories, host_vars and vaults are NEVER published.
+all:
+  children:
+    control:   { hosts: { ctl-01: { ansible_connection: local } } }
+    pve:
+      hosts:
+        hv-a2: { pve_api_host: 10.10.1.21,  pbs_ns: hv-a2, wazuh_agent_name: hv-a2, backup_time: "00:30" }
+        hv-b1: { pve_api_host: 10.10.2.21, pbs_ns: hv-b1, wazuh_agent_name: hv-b1, backup_time: "01:30" }
+      vars: { ansible_host: "{{ pve_api_host }}", ansible_user: ansible, ansible_become: true }
+    pbs:
+      hosts: { pbs-01: { pbs_api_host: pbs.example.local } }
+      vars: { ansible_host: "{{ pbs_api_host }}", ansible_user: ansible, ansible_become: true }
+    firewalls:
+      hosts:
+        pa-site-a: { ansible_host: 10.10.1.1,   device_os: panos }     # + host_vars: pan_pin, pan_api_key (ro vault)
+        pa-site-b: { ansible_host: 10.10.2.1, device_os: panos }
+    windows_dc:
+      hosts:
+        dc-site-a: { ansible_host: 10.10.1.5, ad_domain: example.com }   # + host_vars: ldaps_pin, vault_ad_ro_password

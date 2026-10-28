@@ -12,6 +12,10 @@ This is a sanitized version of a platform I designed, built, and piloted as
 a proof of concept on 10 endpoints. Hostnames, internal IPs, and credentials
 have been replaced with environment-variable placeholders.
 
+It also includes **[infra-automation/](infra-automation/)**: the security-first
+infrastructure automation (guarded changes, encrypted backups, audits and a
+request → approval → execution workflow) used to run a small multi-site estate.
+
 ## What it does
 
 **Pipeline 1 -- Alert triage and ticketing**
@@ -59,6 +63,7 @@ tool this pattern is designed to work alongside — see
 | **Automated response** | Wazuh detection rules, kill switch, host and Palo Alto IP blocking (`security/`) | ✅ Implemented, lab-test first |
 | **General automation** | n8n | ✅ Orchestration engine for the above |
 | **Knowledge / RAG** | pgvector + self-hosted LLM (`n8n-workflows/`) | ✅ Implemented |
+| **Infrastructure automation** | Guarded firewall and AD changes with automatic rollback, encrypted config backups, backup coverage, AD audits, daily checklist, request → approval → execution runner (`infra-automation/`) | ✅ Implemented |
 
 **Status meaning:** *Implemented* means the code is in this repo. The
 platform was piloted on 10 endpoints as a proof of concept and is not
@@ -141,6 +146,26 @@ and **[docs/INCIDENT-RESPONSE.md](docs/INCIDENT-RESPONSE.md)** (playbook).
 | Vector store | PostgreSQL + pgvector | Any vector DB |
 | Ticketing | GLPI | Any ITSM tool with a REST API |
 
+## Infrastructure automation
+
+[`infra-automation/`](infra-automation/) is run from one hardened control
+server, with people working through a request/approval portal:
+
+- **Guarded changes** for firewalls and Active Directory: preview and diff,
+  explicit `YES`, post-change health checks and **automatic rollback**.
+  Nothing is ever deleted by automation.
+- **Read-only by default**: monitoring, backups and audits use read-only
+  accounts over pinned HTTPS/LDAPS; write keys sit in a separate vault.
+- **Backups and evidence**: nightly encrypted firewall config backups with
+  diffs, backup-only hypervisor tokens, a tamper-resistant log archive,
+  backup coverage (OK / STALE / MISSING) and a daily infrastructure checklist.
+- **Request → approval → execution**: the portal never holds credentials;
+  the control server pulls approved jobs and re-checks them against its
+  own catalog and approver list.
+
+See [infra-automation/README.md](infra-automation/README.md) for the full
+contents and how to adapt it.
+
 ## Repository layout
 
 ```
@@ -148,6 +173,7 @@ triage-service/        Standalone Python/Flask reference triage service
 n8n-workflows/         Importable n8n workflow JSON (env-var driven, no secrets)
 it-assistant-portal/   FastAPI + HTML/JS IT operations portal (AI chat, endpoints, ITSM, DLP, monitoring)
 ansible-automation/    Ansible project skeleton with Vault-encrypted secrets pattern
+infra-automation/      Operational automation: guarded changes, backups, audits, daily checks, approval runner
 deploy/                Hardened docker-compose runtime (read-only, no capabilities, kill switch)
 security/              Wazuh detection rules, FIM config, active-response scripts (Palo Alto block, kill switch)
 policy/                OPA/Conftest policies for Dockerfiles and compose files, with unit tests and insecure fixtures

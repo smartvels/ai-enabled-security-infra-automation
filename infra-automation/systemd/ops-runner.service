@@ -1,0 +1,9 @@
+[Unit]
+Description=Ops portal job runner
+Wants=network-online.target
+After=network-online.target
+[Service]
+Type=oneshot
+User=opsadmin
+Environment=PATH=/home/opsadmin/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 /home/opsadmin/infra/tools/runner.py

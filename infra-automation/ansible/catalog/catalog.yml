@@ -1,0 +1,41 @@
+# catalog.yml - the ONLY jobs the runner will execute. Source of truth = ctl-01 (git).
+# risk: standard (0 approvals) | normal (1) | high (2). Deletions are never in this catalog (break-glass only).
+# params: name -> {type: int (min/max) | choice (values) | inventory (group)}
+approver_roles: [superadmin, admin]          # Ops Portal roles allowed to approve (runner re-checks approvers.yml)
+jobs:
+  backup-coverage-report:
+    label: Backup coverage report
+    playbook: playbooks/backup-coverage.yml
+    risk: standard
+    approvals: 0
+    params: {}
+  daily-check-run:
+    label: Run the daily infrastructure checklist now
+    playbook: playbooks/daily-check.yml
+    risk: standard
+    approvals: 0
+    params: {}
+  wazuh-coverage-report:
+    label: Wazuh log coverage report
+    playbook: playbooks/wazuh-coverage.yml
+    risk: standard
+    approvals: 0
+    params: {}
+  vm-start:
+    label: Start a VM
+    playbook: playbooks/vm-power.yml
+    risk: normal
+    approvals: 1
+    params:
+      pve_host: {type: inventory, group: pve}
+      vmid: {type: int, min: 100, max: 999999999}
+    fixed: {power_action: start}
+  vm-shutdown:
+    label: Shut down a VM (graceful)
+    playbook: playbooks/vm-power.yml
+    risk: high
+    approvals: 2
+    params:
+      pve_host: {type: inventory, group: pve}
+      vmid: {type: int, min: 100, max: 999999999}
+    fixed: {power_action: shutdown}

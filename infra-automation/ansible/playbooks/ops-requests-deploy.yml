@@ -1,0 +1,114 @@
+# ops-requests-deploy.yml - phase 1: request -> approval (Ops Portal) -> execution (ctl-01 runner).
+#   ansible-playbook playbooks/ops-requests-deploy.yml -K      (-K: ctl-01 sudo for the runner timer)
+# Re-run after changing catalog.yml or the inventory (it re-publishes the catalog to Ops Portal).
+- name: ctl-01 - runner key, TLS pin, catalog for Ops Portal
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    cfgdir: "{{ lookup('env','HOME') }}/.config/ops-runner"
+    cat: "{{ lookup('file', playbook_dir + '/../catalog/catalog.yml') | from_yaml }}"
+  tasks:
+    - ansible.builtin.file: { path: "{{ cfgdir }}", state: directory, mode: "0700" }
+    - name: Runner key (created once, 0600)
+      ansible.builtin.shell: |
+        umask 077; f={{ cfgdir }}/key
+        [ -s $f ] || python3 -c "import secrets;print(secrets.token_urlsafe(48))" > $f
+        sha256sum $f | awk '{print $1}' >/dev/null; printf '%s' "$(cat $f)" | sha256sum | awk '{print $1}'
+      register: keyhash
+      changed_when: false
+      no_log: true
+    - name: Pin Ops Portal's TLS public key (shown so you can compare)
+      ansible.builtin.shell: |
+        echo | openssl s_client -connect 10.10.1.11:443 2>/dev/null | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64 > {{ cfgdir }}/pin
+        chmod 600 {{ cfgdir }}/pin; echo "pin: $(cat {{ cfgdir }}/pin)"
+      register: pin
+      changed_when: false
+    - ansible.builtin.debug: { msg: "{{ pin.stdout }}" }
+    - name: Catalog for Ops Portal (inventory params expanded to allowed host lists)
+      ansible.builtin.copy:
+        dest: /tmp/ops_catalog.json
+        mode: "0644"
+        content: >-
+          {% set out = {'approver_roles': cat.approver_roles, 'jobs': {}} %}
+          {% for k, v in cat.jobs.items() %}
+          {%   set ps = {} %}
+          {%   for pn, ps_spec in (v.params | default({})).items() %}
+          {%     set _ = ps.update({pn: (ps_spec | combine({'allowed': groups[ps_spec.group] | default([])}) if ps_spec.type == 'inventory' else ps_spec)}) %}
+          {%   endfor %}
+          {%   set _ = out.jobs.update({k: {'label': v.label, 'risk': v.risk, 'approvals': v.approvals, 'params': ps}}) %}
+          {% endfor %}
+          {{ out | to_json }}
+    - ansible.builtin.set_fact: { runner_key_sha256: "{{ keyhash.stdout }}" }
+
+- name: Ops Portal - module, catalog, guard exemption, nginx, env
+  hosts: portal-01
+  become: true
+  gather_facts: false
+  vars:
+    app: /home/chatbot/chatbot
+  tasks:
+    - ansible.builtin.copy: { src: ../files/ops_requests.py, dest: "{{ app }}/ops_requests.py", owner: chatbot, group: chatbot, mode: "0644" }
+    - ansible.builtin.copy: { src: /tmp/ops_catalog.json, dest: "{{ app }}/ops_catalog.json", owner: chatbot, group: chatbot, mode: "0644" }
+    - name: Register the module in chatbot.py + exempt /api/runner/ from session auth (module checks the runner key)
+      ansible.builtin.shell: |
+        set -e; cd {{ app }}
+        python3 - <<'PY'
+        import re, shutil, time, py_compile
+        p = "chatbot.py"; s = open(p).read(); orig = s
+        line = "import ops_requests; ops_requests.register(app, verify_session, ROLES, DB_PATH)  # ctl-01 phase 1\n"
+        if "ops_requests.register" not in s:
+            m = re.search(r'^if __name__ == [\'"]__main__[\'"]:', s, re.M) or re.search(r'^uvicorn\.run\(', s, re.M)
+            if not m: raise SystemExit("STOP: no main block found")
+            s = s[:m.start()] + line + "\n" + s[m.start():]
+        s = s.replace('_AG_PUBLIC_PREFIX = ("/api/agent/",)', '_AG_PUBLIC_PREFIX = ("/api/agent/", "/api/runner/")')
+        if s != orig:
+            b = p + ".pre-requests-" + time.strftime("%Y%m%dT%H%M%S"); shutil.copy2(p, b); open(p, "w").write(s)
+            try: py_compile.compile(p, doraise=True)
+            except Exception as e: shutil.copy2(b, p); raise SystemExit("STOP: compile failed, restored: %s" % e)
+            print("chatbot.py patched, backup", b)
+        else: print("chatbot.py already patched")
+        PY
+        chown chatbot:chatbot chatbot.py; grep -c '"/api/runner/"' chatbot.py
+      register: patch
+    - ansible.builtin.debug: { var: patch.stdout_lines }
+    - name: Runner key hash for the app
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/ops-portal.service.d/runner.conf
+        mode: "0600"
+        content: "[Service]\nEnvironment=RUNNER_KEY_SHA256={{ hostvars['localhost'].runner_key_sha256 }}\n"
+      no_log: true
+    - name: nginx - /api/runner/ only from ctl-01
+      ansible.builtin.shell: |
+        f=/etc/nginx/sites-enabled/portal; grep -q 'location /api/runner/' $f && { echo present; exit 0; }
+        cp -a $f /root/nginx-portal.bak-$(date +%F-%H%M)
+        python3 - <<'PY'
+        p = "/etc/nginx/sites-enabled/portal"; s = open(p).read()
+        blk = ("    location /api/runner/ {\n        allow 10.10.1.10;\n        deny all;\n        proxy_pass http://127.0.0.1:7000;\n"
+               "        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n    }\n\n")
+        i = s.index("    location / {"); open(p, "w").write(s[:i] + blk + s[i:])
+        PY
+        nginx -t && systemctl reload nginx && echo added
+      register: ng
+    - ansible.builtin.debug: { var: ng.stdout_lines }
+    - name: Restart Ops Portal and check
+      ansible.builtin.shell: |
+        systemctl daemon-reload; systemctl restart ops-portal; sleep 6; systemctl is-active ops-portal
+        echo "requests page: $(curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1/requests)"
+      register: chk
+    - ansible.builtin.debug: { var: chk.stdout_lines }
+
+- name: ctl-01 - runner timer (every minute)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tasks:
+    - ansible.builtin.copy:
+        dest: "/etc/systemd/system/{{ item.n }}"
+        mode: "0644"
+        content: "{{ item.c }}"
+      loop:
+        - { n: ops-runner.service, c: "[Unit]\nDescription=Ops Portal job runner (ctl-01)\nWants=network-online.target\nAfter=network-online.target\n[Service]\nType=oneshot\nUser=opsadmin\nEnvironment=PATH=/home/opsadmin/.local/bin:/usr/local/bin:/usr/bin:/bin\nExecStart=/usr/bin/python3 /home/opsadmin/infra/tools/runner.py\nTimeoutStartSec=40min\n" }
+        - { n: ops-runner.timer, c: "[Unit]\nDescription=Ops Portal job runner every minute\n[Timer]\nOnCalendar=*-*-* *:*:00\nAccuracySec=5s\n[Install]\nWantedBy=timers.target\n" }
+    - ansible.builtin.systemd: { name: ops-runner.timer, state: started, enabled: true, daemon_reload: true }

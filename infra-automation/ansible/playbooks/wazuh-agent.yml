@@ -1,0 +1,108 @@
+# wazuh-agent.yml - install + enroll the Wazuh agent (pinned 4.14.8) on Linux hosts; ctl-01 gets extra monitoring.
+#   ansible-playbook playbooks/wazuh-agent.yml -l ctl-01            # ctl-01 = localhost (connection: local)
+# - Repo key verified against the pinned fingerprint before use; package pinned + held.
+# - Enrollment password is read from wazuh-01 (/var/ossec/etc/authd.pass) at run time - never stored in git or shown.
+# - ctl-01: journald (pan-backup, offsite-push, sudo, sshd) + FIM on vaults, repo config, ssh/sudo config.
+- name: Read enrollment password from the Wazuh master
+  hosts: wazuh-01
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.slurp: { src: /var/ossec/etc/authd.pass }
+      register: authd
+      no_log: true
+
+- name: Wazuh agent
+  hosts: "{{ target | default('ctl-01') }}"
+  become: true
+  vars:
+    wazuh_version: "4.14.8-1"
+    wazuh_key_fpr: "0DCFCA5547B19D2A6099506096B3EE5F29111145"   # public Wazuh signing-key fingerprint  gitleaks:allow
+    manager_ip: 10.10.1.40
+    agent_groups: "default"
+    enroll_pass: "{{ hostvars['wazuh-01'].authd.content | b64decode | trim }}"
+  tasks:
+    - name: Repo key - download and verify fingerprint before trusting it
+      ansible.builtin.shell: |
+        set -euo pipefail
+        T=$(mktemp); curl -fsSL https://packages.wazuh.com/key/GPG-KEY-WAZUH -o "$T"
+        FPR=$(gpg --show-keys --with-colons "$T" | awk -F: '/^fpr/{print $10; exit}')
+        [ "$FPR" = "{{ wazuh_key_fpr }}" ] || { echo "KEY FINGERPRINT MISMATCH: $FPR"; exit 1; }
+        gpg --dearmor < "$T" > /usr/share/keyrings/wazuh.gpg; chmod 644 /usr/share/keyrings/wazuh.gpg; rm -f "$T"
+        echo "key ok: $FPR"
+      args: { executable: /bin/bash, creates: /usr/share/keyrings/wazuh.gpg }
+
+    - name: Repo
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/wazuh.list
+        content: "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main\n"
+        mode: "0644"
+
+    - name: Install pinned agent (enrollment settings via env, password not on the command line)
+      ansible.builtin.apt:
+        name: "wazuh-agent={{ wazuh_version }}"
+        update_cache: true
+      environment:
+        WAZUH_MANAGER: "{{ manager_ip }}"
+        WAZUH_AGENT_NAME: "{{ wazuh_agent_name | default(inventory_hostname) }}"
+        WAZUH_AGENT_GROUP: "{{ agent_groups }}"
+
+    - name: Hold the version
+      ansible.builtin.dpkg_selections: { name: wazuh-agent, selection: hold }
+
+    - name: Enrollment password file (agent reads it once at enrollment)
+      ansible.builtin.copy:
+        dest: /var/ossec/etc/authd.pass
+        content: "{{ enroll_pass }}\n"
+        owner: root
+        group: wazuh
+        mode: "0640"
+      no_log: true
+
+    - name: ctl-01 extra monitoring (journald + FIM)
+      ansible.builtin.blockinfile:
+        path: /var/ossec/etc/ossec.conf
+        marker: "<!-- {mark} ctl01-extra (ansible) -->"
+        insertbefore: "</ossec_config>"
+        block: |
+          <localfile>
+            <log_format>journald</log_format>
+            <location>journald</location>
+          </localfile>
+          <syscheck>
+            <directories realtime="yes">/home/opsadmin/.ansible-vault</directories>
+            <directories realtime="yes">/home/opsadmin/.ssh</directories>
+            <directories realtime="yes">/home/opsadmin/infra/ansible/ansible.cfg,/home/opsadmin/infra/.gitleaks.toml,/home/opsadmin/infra/.git/hooks</directories>
+            <directories realtime="yes">/home/opsadmin/.config/offsite</directories>
+            <directories realtime="yes">/etc/ssh,/etc/sudoers,/etc/sudoers.d,/etc/systemd/system</directories>
+          </syscheck>
+      when: inventory_hostname == 'ctl-01'
+
+    - name: Proxmox/PBS host monitoring (journald + file integrity)
+      ansible.builtin.blockinfile:
+        path: /var/ossec/etc/ossec.conf
+        marker: "<!-- {mark} pve-host (ansible) -->"
+        insertbefore: "</ossec_config>"
+        block: |
+          <localfile>
+            <log_format>journald</log_format>
+            <location>journald</location>
+          </localfile>
+          <syscheck>
+            <directories realtime="yes">/etc/ssh,/root/.ssh,/home/ansible/.ssh,/etc/sudoers,/etc/sudoers.d</directories>
+            <directories realtime="yes">/etc/network/interfaces,/etc/hosts,/etc/systemd/system,/etc/cron.d</directories>
+            <directories>/etc/pve</directories>
+          </syscheck>
+      when: inventory_hostname in groups['pve'] | default([]) or inventory_hostname in groups['pbs'] | default([])
+
+    - name: Start agent
+      ansible.builtin.systemd: { name: wazuh-agent, state: restarted, enabled: true }
+
+    - name: Remove the enrollment password once enrolled
+      ansible.builtin.shell: |
+        for i in $(seq 1 30); do grep -q "Connected to the server" /var/ossec/logs/ossec.log && break; sleep 2; done
+        grep -q "Connected to the server" /var/ossec/logs/ossec.log && shred -u /var/ossec/etc/authd.pass && echo "enrolled + connected"
+        grep -iE "error|refused|invalid" /var/ossec/logs/ossec.log | tail -3
+      register: enr
+      changed_when: "'enrolled' in enr.stdout"
+    - ansible.builtin.debug: { var: enr.stdout_lines }

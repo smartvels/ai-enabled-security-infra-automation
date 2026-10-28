@@ -1,0 +1,208 @@
+# log-archive.yml - 180-day tamper-resistant raw-log archive on the PBS (CERT-In evidence copy).
+#   ansible-playbook playbooks/log-archive.yml                                  # set up / update everything
+#   ansible-playbook playbooks/log-archive.yml -e push_now=true                 # also push yesterday's files now
+#   ansible-playbook playbooks/log-archive.yml -e '{"audit_users":[{"name":"audit-user","key":"ssh-ed25519 AAAA... comment"}]}'
+# Flow: wazuh nodes 01:00 push yesterday's archive (.json.gz/.log.gz + .sha256) into their own write-only inbox
+#       PBS 01:30 verifies sha256, moves to /backup/log-archive/wazuh/<node>/<YYYY>/<Mon>/, chmod 0440, chattr +i,
+#       appends to manifests/<YYYY-MM>.txt, ZFS snapshot (kept 190 days), removes files older than 180 days.
+# Read-only auditors: SFTP only (internal-sftp -R), chrooted to the archive, group logaudit.
+- name: Wazuh nodes - push key (created once, stays on the node)
+  hosts: wazuh-01,wazuh-02
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Key pair for log push
+      ansible.builtin.command: ssh-keygen -t ed25519 -N "" -C "logpush@{{ inventory_hostname }}" -f /root/.ssh/logpush_ed25519
+      args: { creates: /root/.ssh/logpush_ed25519 }
+    - ansible.builtin.slurp: { src: /root/.ssh/logpush_ed25519.pub }
+      register: pub
+
+- name: PBS - dataset, accounts, sshd rules, ingest + retention
+  hosts: pbs
+  become: true
+  gather_facts: false
+  vars:
+    root: /backup/log-archive
+    nodes: [wazuh-01, wazuh-02]
+    audit_users: []
+  tasks:
+    - name: Dataset (500G quota + reservation, no exec)
+      ansible.builtin.shell: |
+        zfs list backup/log-archive >/dev/null 2>&1 && { echo exists; exit 0; }
+        zfs create -o mountpoint={{ root }} -o quota=500G -o reservation=500G -o compression=zstd -o atime=off -o exec=off -o setuid=off backup/log-archive && echo created
+      register: ds
+      changed_when: "'created' in ds.stdout"
+
+    - name: Groups
+      ansible.builtin.group: { name: "{{ item }}", system: true }
+      loop: [logpush, logaudit]
+
+    - name: Push accounts (one per Wazuh node, no password, no shell)
+      ansible.builtin.user:
+        name: "lp-{{ item }}"
+        group: logpush
+        shell: /usr/sbin/nologin
+        home: "/var/lib/logpush/lp-{{ item }}"
+        create_home: true
+        password: "!"
+      loop: "{{ nodes }}"
+
+    - name: Push keys - accepted only from that node's IP
+      ansible.builtin.copy:
+        dest: "/var/lib/logpush/lp-{{ item }}/authorized_keys"
+        content: 'from="{{ hostvars[item].ansible_host }}",restrict {{ hostvars[item].pub.content | b64decode | trim }}{{ "\n" }}'
+        owner: root
+        group: root
+        mode: "0644"
+      loop: "{{ nodes }}"
+
+    - name: Folders (chroot dirs root-owned; inbox writable by its node only)
+      ansible.builtin.shell: |
+        set -e
+        install -d -o root -g root -m 0755 {{ root }} {{ root }}/inbox
+        install -d -o root -g logaudit -m 0750 {{ root }}/wazuh {{ root }}/manifests
+        {% for n in nodes %}
+        install -d -o root -g root -m 0755 {{ root }}/inbox/lp-{{ n }}
+        install -d -o lp-{{ n }} -g logpush -m 0700 {{ root }}/inbox/lp-{{ n }}/drop
+        install -d -o root -g logaudit -m 0750 {{ root }}/wazuh/{{ n }}
+        {% endfor %}
+      changed_when: false
+
+    - name: sshd rules (push = write-only inbox; audit = read-only archive)
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config.d/80-log-archive.conf
+        mode: "0644"
+        content: |
+          Match Group logpush
+              AuthorizedKeysFile /var/lib/logpush/%u/authorized_keys
+              ChrootDirectory {{ root }}/inbox/%u
+              ForceCommand internal-sftp -d /drop
+              PasswordAuthentication no
+              AllowTcpForwarding no
+              X11Forwarding no
+              PermitTTY no
+          Match Group logaudit
+              ChrootDirectory {{ root }}
+              ForceCommand internal-sftp -R
+              PasswordAuthentication no
+              AllowTcpForwarding no
+              X11Forwarding no
+              PermitTTY no
+      register: sshdconf
+
+    - name: Validate + reload sshd
+      ansible.builtin.shell: sshd -t && systemctl reload ssh && echo reloaded
+      when: sshdconf.changed
+
+    - name: Read-only audit users (SFTP only)
+      ansible.builtin.user:
+        name: "{{ item.name }}"
+        groups: logaudit
+        shell: /usr/sbin/nologin
+        password: "!"
+        create_home: true
+      loop: "{{ audit_users }}"
+    - ansible.builtin.copy:
+        dest: "/home/{{ item.name }}/.ssh/authorized_keys"
+        content: "{{ item.key }}\n"
+        owner: "{{ item.name }}"
+        mode: "0600"
+      loop: "{{ audit_users }}"
+      when: audit_users | length > 0
+
+    - name: Ingest + retention script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/log-archive-ingest.sh
+        mode: "0750"
+        content: |
+          #!/bin/bash
+          # verify -> archive (0440, immutable) -> manifest -> snapshot -> 180-day retention
+          set -uo pipefail
+          R={{ root }}; KEEP=180; log() { logger -t log-archive "$*"; }
+          for d in $R/inbox/lp-*/drop; do
+            node=${d#$R/inbox/lp-}; node=${node%/drop}
+            for f in "$d"/*.gz; do
+              [ -e "$f" ] || continue
+              s="$f.sha256"; [ -f "$s" ] || { log "WAITING no checksum for $(basename $f) from $node"; continue; }
+              want=$(awk '{print $1}' "$s"); have=$(sha256sum "$f" | awk '{print $1}')
+              if [ "$want" != "$have" ]; then log "ERROR checksum mismatch $(basename $f) from $node - kept in inbox"; continue; fi
+              # path from the file name: ossec-archive-DD.json.gz uploaded as YYYY-Mon-ossec-archive-DD.json.gz
+              b=$(basename "$f"); y=${b:0:4}; m=${b:5:3}
+              dest=$R/wazuh/$node/$y/$m; install -d -o root -g logaudit -m 0750 $R/wazuh/$node/$y "$dest"
+              if [ -e "$dest/$b" ]; then log "SKIP duplicate $b from $node"; rm -f "$f" "$s"; continue; fi
+              mv "$f" "$dest/$b" && mv "$s" "$dest/$b.sha256"
+              chown root:logaudit "$dest/$b" "$dest/$b.sha256"; chmod 0440 "$dest/$b" "$dest/$b.sha256"
+              chattr +i "$dest/$b" "$dest/$b.sha256" 2>/dev/null || log "WARN chattr +i not supported"
+              echo "$(date -Is) $node $y/$m/$b $have $(stat -c %s "$dest/$b")" >> $R/manifests/$(date +%Y-%m).txt
+              log "ARCHIVED $node $b ($(stat -c %s "$dest/$b") bytes)"
+            done
+          done
+          chown root:logaudit $R/manifests/*.txt 2>/dev/null; chmod 0440 $R/manifests/*.txt 2>/dev/null
+          zfs snapshot backup/log-archive@daily-$(date +%F) 2>/dev/null && log "snapshot daily-$(date +%F)"
+          zfs list -H -t snapshot -o name -s creation backup/log-archive | grep '@daily-' | head -n -190 | xargs -r -n1 zfs destroy
+          find $R/wazuh -type f -mtime +$KEEP | while read -r old; do chattr -i "$old" 2>/dev/null; rm -f "$old" && log "RETENTION removed $old (>${KEEP} days)"; done
+          log "ingest done; archive size $(du -sh $R | cut -f1)"
+
+    - name: Ingest timer 01:30
+      ansible.builtin.copy:
+        dest: "/etc/systemd/system/{{ item.n }}"
+        mode: "0644"
+        content: "{{ item.c }}"
+      loop:
+        - { n: log-archive-ingest.service, c: "[Unit]\nDescription=Log archive ingest + retention\n[Service]\nType=oneshot\nExecStart=/usr/local/sbin/log-archive-ingest.sh\n" }
+        - { n: log-archive-ingest.timer, c: "[Unit]\nDescription=Log archive ingest 01:30\n[Timer]\nOnCalendar=*-*-* 01:30:00\nPersistent=true\n[Install]\nWantedBy=timers.target\n" }
+    - ansible.builtin.systemd: { name: log-archive-ingest.timer, state: started, enabled: true, daemon_reload: true }
+
+    - name: PBS host key (for the Wazuh nodes' known_hosts)
+      ansible.builtin.slurp: { src: /etc/ssh/ssh_host_ed25519_key.pub }
+      register: pbskey
+
+- name: Wazuh nodes - nightly push 01:00
+  hosts: wazuh-01,wazuh-02
+  become: true
+  gather_facts: false
+  vars:
+    pbs: "{{ groups['pbs'][0] }}"
+    pbs_ip: 10.10.1.30
+  tasks:
+    - name: Pin the PBS host key
+      ansible.builtin.lineinfile:
+        path: /root/.ssh/known_hosts
+        create: true
+        mode: "0600"
+        line: "{{ pbs_ip }} {{ hostvars[pbs].pbskey.content | b64decode | trim | regex_replace(' [^ ]+$', '') }}"
+    - name: Push script
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/log-archive-push.sh
+        mode: "0750"
+        content: |
+          #!/bin/bash
+          # push one day's compressed raw archive(s) to the PBS inbox. Usage: log-archive-push.sh [YYYY-MM-DD] (default yesterday)
+          set -uo pipefail
+          D=${1:-$(date -d yesterday +%F)}; Y=$(date -d "$D" +%Y); M=$(date -d "$D" +%b); DD=$(date -d "$D" +%d)
+          SRC=/var/ossec/logs/archives/$Y/$M; T=$(mktemp -d); trap 'rm -rf $T' EXIT; n=0
+          for f in $SRC/ossec-archive-$DD.json.gz $SRC/ossec-archive-$DD.log.gz; do
+            [ -f "$f" ] || continue
+            b="$Y-$M-$(basename $f)"; ln -s "$f" "$T/$b"; (cd $T && sha256sum "$b" > "$b.sha256"); n=$((n+1))
+          done
+          [ $n -gt 0 ] || { logger -t log-archive "no archive file for $D on $(hostname)"; exit 0; }
+          ( cd $T && for b in $(ls *.gz); do echo "put -p $b"; echo "put -p $b.sha256"; done ) > $T/batch
+          cd $T && sftp -q -b $T/batch -i /root/.ssh/logpush_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes lp-{{ inventory_hostname }}@{{ pbs_ip }} \
+            && logger -t log-archive "PUSHED $D ($n file(s)) from {{ inventory_hostname }}" \
+            || logger -t log-archive -p user.err "PUSH FAILED $D from {{ inventory_hostname }}"
+    - name: Push timer 01:00
+      ansible.builtin.copy:
+        dest: "/etc/systemd/system/{{ item.n }}"
+        mode: "0644"
+        content: "{{ item.c }}"
+      loop:
+        - { n: log-archive-push.service, c: "[Unit]\nDescription=Push yesterday's raw archive to the PBS log archive\nWants=network-online.target\nAfter=network-online.target\n[Service]\nType=oneshot\nExecStart=/usr/local/sbin/log-archive-push.sh\n" }
+        - { n: log-archive-push.timer, c: "[Unit]\nDescription=Log archive push 01:00\n[Timer]\nOnCalendar=*-*-* 01:00:00\nRandomizedDelaySec=5min\nPersistent=true\n[Install]\nWantedBy=timers.target\n" }
+    - ansible.builtin.systemd: { name: log-archive-push.timer, state: started, enabled: true, daemon_reload: true }
+
+    - name: Optional - push yesterday now (test)
+      ansible.builtin.shell: /usr/local/sbin/log-archive-push.sh && journalctl -t log-archive -n 2 -o cat
+      register: pn
+      when: push_now | default(false) | bool
+    - ansible.builtin.debug: { var: pn.stdout_lines }
+      when: push_now | default(false) | bool

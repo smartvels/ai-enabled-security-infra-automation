@@ -1,0 +1,7 @@
+[Unit]
+Description=Daily read-only AD report timer
+[Timer]
+OnCalendar=*-*-* 07:10:00
+Persistent=true
+[Install]
+WantedBy=timers.target

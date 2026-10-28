@@ -1,0 +1,59 @@
+# update-policy.yml - stop uncontrolled updates from taking production services down (incident 24-27 Oct, Zabbix).
+#   ansible-playbook playbooks/update-policy.yml                       # managed Ubuntu servers + check PVE/PBS
+# Ubuntu servers: automatic updates = SECURITY ONLY, never database/monitoring/SIEM packages, never restart
+# services automatically (needrestart list-only), never reboot. Everything else: weekly controlled patching.
+# Proxmox hosts / PBS: automatic upgrades must be OFF (reported; switched off if found on).
+- name: Ubuntu servers - security-only, no automatic service restarts
+  hosts: "{{ target | default('ctl-01:wazuh-01:wazuh-02:zabbix-01:portal-01') }}"
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Policy for unattended-upgrades
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/52ctl01-update-policy
+        mode: "0644"
+        content: |
+          // managed by ctl-01 (update-policy.yml) - do not edit by hand
+          Unattended-Upgrade::Allowed-Origins:: "${distro_id}:${distro_codename}-security";
+          Unattended-Upgrade::Package-Blacklist {
+              "mysql-"; "mariadb-"; "postgresql"; "zabbix-"; "wazuh-"; "filebeat"; "opensearch";
+          };
+          Unattended-Upgrade::Automatic-Reboot "false";
+          Unattended-Upgrade::Remove-Unused-Dependencies "false";
+    - name: Never restart services automatically after updates (list only)
+      ansible.builtin.copy:
+        dest: /etc/needrestart/conf.d/90-ctl01.conf
+        mode: "0644"
+        content: |
+          # managed by ctl-01: services are restarted in the weekly patch window, not by unattended updates
+          $nrconf{restart} = 'l';
+      failed_when: false
+    - name: Effective settings
+      ansible.builtin.shell: |
+        echo "unattended-upgrades: $(systemctl is-enabled unattended-upgrades 2>/dev/null || echo not-installed)"
+        apt-config dump 2>/dev/null | grep -E '^Unattended-Upgrade::(Package-Blacklist|Automatic-Reboot) ' | sed 's/^Unattended-Upgrade:://' | head -12
+        echo "needrestart: $(grep -h "nrconf{restart}" /etc/needrestart/conf.d/90-ctl01.conf 2>/dev/null | tr -d ' ')"
+      register: eff
+      changed_when: false
+    - ansible.builtin.debug: { var: eff.stdout_lines }
+
+- name: Proxmox hosts + PBS - automatic upgrades must be off
+  hosts: pve:pbs
+  become: true
+  gather_facts: false
+  tasks:
+    - name: State
+      ansible.builtin.shell: |
+        a=$(systemctl is-enabled unattended-upgrades 2>/dev/null || echo not-installed)
+        p=$(grep -h 'APT::Periodic::Unattended-Upgrade' /etc/apt/apt.conf.d/* 2>/dev/null | grep -o '"[0-9]"' | tr -d '"' | tail -1)
+        echo "$a|${p:-0}"
+      register: st
+      changed_when: false
+    - name: Switch it off where it is on
+      ansible.builtin.shell: |
+        systemctl disable --now unattended-upgrades 2>/dev/null || true
+        printf 'APT::Periodic::Unattended-Upgrade "0";\n' > /etc/apt/apt.conf.d/52ctl01-update-policy
+        echo "switched off"
+      when: st.stdout.split('|')[0] == 'enabled' or st.stdout.split('|')[1] == '1'
+    - ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: unattended={{ st.stdout.split('|')[0] }} periodic={{ st.stdout.split('|')[1] }}"

@@ -1,0 +1,80 @@
+# package-changes.yml - READ-ONLY: record every package change on managed hosts in the change register.
+#   ansible-playbook playbooks/package-changes.yml                 # last 2 days (nightly)
+#   ansible-playbook playbooks/package-changes.yml -e days=30      # backfill
+# Output: ~/infra/docs/changes/auto/<YYYY-MM>.csv  (one line per apt run; duplicates are skipped)
+- name: Collect apt history
+  hosts: "{{ target | default('pve:pbs:ctl-01:wazuh-01:wazuh-02:zabbix-01:portal-01') }}"
+  become: "{{ inventory_hostname != 'ctl-01' }}"   # ctl-01 runs unattended without sudo
+  gather_facts: false
+  ignore_unreachable: true
+  vars:
+    days: 2
+  tasks:
+    - name: Parse /var/log/apt/history.log*
+      ansible.builtin.shell: |
+        python3 - {{ days }} <<'PY'
+        import glob, gzip, json, sys, datetime
+        since = datetime.datetime.now() - datetime.timedelta(days=int(sys.argv[1]))
+        runs = []
+        for f in sorted(glob.glob('/var/log/apt/history.log*')):
+            op = gzip.open if f.endswith('.gz') else open
+            try: text = op(f, 'rt', errors='replace').read()
+            except Exception: continue
+            for block in text.split('\n\n'):
+                d = {}
+                for line in block.strip().splitlines():
+                    k, _, v = line.partition(': ')
+                    d[k.strip()] = v.strip()
+                if 'Start-Date' not in d: continue
+                try: t = datetime.datetime.strptime(d['Start-Date'], '%Y-%m-%d  %H:%M:%S')
+                except ValueError: continue
+                if t < since: continue
+                pk = []
+                for act in ('Upgrade', 'Install', 'Remove', 'Purge', 'Downgrade'):
+                    if act in d:
+                        names = [p.split(':')[0].split(' ')[0] for p in d[act].split('), ')]
+                        pk.append('%s %d: %s' % (act.lower(), len(names), ' '.join(names[:12]) + (' ...' if len(names) > 12 else '')))
+                cmd = d.get('Commandline', '')
+                rb = d.get('Requested-By', '')
+                who = ('manual (%s)' % rb.split(' ')[0]) if rb else ('automatic (unattended-upgrades)' if not cmd or 'unattended' in cmd else 'manual (root)')
+                runs.append({'start': t.strftime('%Y-%m-%d %H:%M'), 'by': who, 'cmd': cmd[:80], 'changes': '; '.join(pk)})
+        print(json.dumps(runs))
+        PY
+      register: h
+      changed_when: false
+    - ansible.builtin.set_fact:
+        apt_runs: "{{ h.stdout | from_json }}"
+
+- name: Append to the change register
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Collected data to a temp file
+      ansible.builtin.copy:
+        dest: /tmp/apt-runs.json
+        mode: "0600"
+        content: "{{ dict(groups['all'] | map('extract', hostvars) | selectattr('apt_runs', 'defined') | map(attribute='inventory_hostname') | zip(groups['all'] | map('extract', hostvars) | selectattr('apt_runs', 'defined') | map(attribute='apt_runs'))) | to_json }}"
+    - name: Write monthly CSV (dedupe on host + start time)
+      ansible.builtin.shell: |
+        python3 - <<'PY'
+        import csv, json, os
+        data = json.load(open('/tmp/apt-runs.json')); os.remove('/tmp/apt-runs.json')
+        base = os.path.expanduser('~/infra/docs/changes/auto'); os.makedirs(base, exist_ok=True)
+        added = 0
+        for host, runs in data.items():
+            for r in runs:
+                f = os.path.join(base, r['start'][:7] + '.csv')
+                seen = set()
+                if os.path.exists(f):
+                    seen = {(row[1], row[2]) for row in csv.reader(open(f))}
+                if (host, r['start']) in seen: continue
+                new = not os.path.exists(f)
+                with open(f, 'a', newline='') as fh:
+                    w = csv.writer(fh)
+                    if new: w.writerow(['type', 'host', 'start', 'by', 'changes', 'command'])
+                    w.writerow(['package-change', host, r['start'], r['by'], r['changes'], r['cmd']]); added += 1
+        print('change records added:', added)
+        PY
+      register: w
+    - ansible.builtin.debug: { var: w.stdout_lines }

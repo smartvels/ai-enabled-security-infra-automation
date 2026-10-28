@@ -1,0 +1,21 @@
+[Unit]
+Description=Palo Alto read-only config backup (encrypted) + change detection
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=opsadmin
+Group=opsadmin
+ExecStart=/home/opsadmin/infra/tools/pan-backup-auto.sh
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/home/opsadmin/infra /home/opsadmin/.ansible /dev/shm
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+TimeoutStartSec=20min

@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily read-only AD report
+Wants=network-online.target
+After=network-online.target
+[Service]
+Type=oneshot
+User=opsadmin
+Environment=PATH=/home/opsadmin/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 /home/opsadmin/infra/tools/ad_report.py

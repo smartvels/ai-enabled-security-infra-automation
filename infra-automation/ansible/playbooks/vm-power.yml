@@ -1,0 +1,27 @@
+# vm-power.yml - start or gracefully shut down ONE VM (catalog jobs vm-start / vm-shutdown). Never deletes.
+#   ansible-playbook playbooks/vm-power.yml -e pve_host=hv-a2 -e vmid=100 -e power_action=start
+- name: VM power
+  hosts: "{{ pve_host }}"
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.assert:
+        that:
+          - pve_host in groups['pve']
+          - vmid | string is match('^[0-9]{3,9}$')
+          - power_action in ['start', 'shutdown']
+    - name: VM must exist
+      ansible.builtin.command: qm status {{ vmid }}
+      register: before
+      changed_when: false
+    - name: Start
+      ansible.builtin.command: qm start {{ vmid }}
+      when: power_action == 'start' and 'running' not in before.stdout
+    - name: Graceful shutdown (5 min, no force)
+      ansible.builtin.command: qm shutdown {{ vmid }} --timeout 300
+      when: power_action == 'shutdown' and 'running' in before.stdout
+    - ansible.builtin.command: qm status {{ vmid }}
+      register: after
+      changed_when: false
+    - ansible.builtin.debug:
+        msg: "VM {{ vmid }} on {{ pve_host }}: {{ before.stdout }} -> {{ after.stdout }}"
