@@ -1,0 +1,68 @@
+# daily-checklist.yml - definition of the daily infrastructure checklist (per company, per site).
+# Read by playbooks/daily-check.yml and tools/checklist_render.py. Change here, not in the code.
+# Items marked CONFIRM are best guesses from the inventory - correct them if wrong.
+sites:
+  site-a:
+    label: Site-A
+    firewall: { type: panos, host: pa-site-a }
+    isps:
+      - { name: ISP-1, interface: ethernet1/1 }
+      - { name: ISP-2,    interface: ethernet1/2 }
+      - { name: ISP-3,     interface: ethernet1/3 }
+    temperature: { hv-a1: "Inlet Ambient", hv-a2: "Ambient 1" }   # IPMI sensor name per host
+    hosts: [hv-a1, hv-a2, hv-a3, hv-a4, hv-a5, log-01, app-01, pbs-01]
+    switches: [sw-a1, sw-a2, sw-a3, sw-a4, sw-a5]
+    ap_ips: [10.10.1.101, 10.10.1.102, 10.10.1.103, 10.10.1.104, 10.10.1.105, 10.10.1.106]
+    other_ips: [10.10.1.120]
+    tools:                               # our own tools - service running + data flowing
+      - { name: Zabbix,       host: zabbix-01,  services: [mysql, zabbix-server, apache2] }
+      - { name: Wazuh master, host: wazuh-01,   services: [wazuh-manager, wazuh-indexer, wazuh-dashboard], data_file: /var/ossec/logs/archives/archives.json }
+      - { name: Wazuh worker, host: wazuh-02,   services: [wazuh-manager, filebeat], data_file: /var/ossec/logs/archives/archives.json }
+      - { name: PBS,          host: pbs-01,      services: [proxmox-backup-proxy] }
+      - { name: Ops Portal,   host: portal-01, services: [ops-portal, nginx] }
+      - { name: ctl-01,       host: ctl-01,     services: [pan-backup.timer, daily-check.timer, backup-coverage.timer, offsite-push.timer] }
+  site-b:
+    label: Site-B
+    firewall: { type: panos, host: pa-site-b }
+    isps:
+      - { name: ISP-1, interface: ethernet1/2 }
+      - { name: ISP-2, interface: ethernet1/3 }
+      - { name: ISP-3, interface: ethernet1/4 }
+    temperature: {}                      # no IPMI on hv-b1/hv-b2 - manual
+    hosts: [hv-b1, hv-b2]
+    switches: [sw-b1]
+    ap_ips: [10.10.2.101, 10.10.2.102, 10.10.2.103, 10.10.2.104, 10.10.2.105, 10.10.2.106]
+    other_ips: []
+  site-c:
+    label: Site-C
+    firewall: { type: ping, ip: 10.10.3.1 }   # ping-only check (no API-managed firewall at this site)
+    isps: []
+    temperature: {}
+    hosts: [hv-c1]
+    switches: []
+    ap_ips: [10.10.3.101]
+    other_ips: []
+
+companies:
+  acme:
+    label: Acme Corp
+    sites: [site-a, site-b, site-c]
+    domain_controllers:                  # AD backup = newest PBS backup of this VM < 26 h
+      site-a:    [{ host: log-01, vm: DC01 }]
+      site-b:    [{ host: hv-b1, vm: Acme }]          # CONFIRM
+      site-c: [{ host: hv-c1, vm: DC03 }]
+  companyb:
+    label: CompanyB
+    sites: [site-a, site-b, site-c]
+    domain_controllers:
+      site-a:    [{ host: app-01, vm: DC-B01 }]
+      site-b:    [{ host: hv-b1, vm: CompanyB }]              # CONFIRM
+      site-c: [{ host: hv-c1, vm: DC-B03, note: "not in service (VLAN pending)" }]
+  companyc:
+    label: CompanyC
+    sites: [site-a, site-b]
+    domain_controllers:
+      site-a:    [{ host: app-01, vm: DC-C01 }]
+      site-b:    [{ host: hv-b2, vm: CompanyC }]            # CONFIRM
+
+backup_max_age_hours: 26

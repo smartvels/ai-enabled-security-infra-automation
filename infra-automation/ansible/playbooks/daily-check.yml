@@ -1,0 +1,140 @@
+# daily-check.yml - READ-ONLY daily infrastructure check -> raw JSON evidence + per-company sheets.
+#   ansible-playbook playbooks/daily-check.yml
+# Evidence: ~/infra/docs/evidence/daily-checks/<YYYY>/<MM>/<date>.json (+ .sha256) and HTML sheets per company.
+- name: Hosts - reachability, uptime, VMs, temperature
+  hosts: pve:pbs
+  become: true
+  gather_facts: false
+  ignore_unreachable: true
+  tasks:
+    - name: Collect
+      ansible.builtin.shell: |
+        echo "uptime_s=$(cut -d. -f1 /proc/uptime)"
+        if command -v qm >/dev/null; then
+          qm list 2>/dev/null | awk 'NR>1 {print "vm=" $1 "|" $2 "|" $3}'
+        fi
+        command -v ipmitool >/dev/null && ipmitool sdr type Temperature 2>/dev/null | awk -F'|' '{gsub(/^ +| +$/,"",$1); gsub(/^ +| +$/,"",$5); print "temp=" $1 "|" $5}'
+        true
+      register: h
+      changed_when: false
+    - ansible.builtin.set_fact:
+        hinfo:
+          reachable: true
+          uptime_s: "{{ (h.stdout_lines | select('match','^uptime_s=') | first | default('uptime_s=0')).split('=')[1] | int }}"
+          vms: "{{ h.stdout_lines | select('match','^vm=') | map('regex_replace','^vm=','') | map('split','|') | list }}"
+          temps: "{{ h.stdout_lines | select('match','^temp=') | map('regex_replace','^temp=','') | map('split','|') | list }}"
+
+- name: PBS - newest snapshot per namespace/vm
+  hosts: pbs
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.shell: |
+        cd /backup/datastore/ns 2>/dev/null || exit 0
+        for ns in */; do ns=${ns%/}; for id in $(ls "$ns/vm" 2>/dev/null); do
+          last=$(ls -1 "$ns/vm/$id" | grep -E '^[0-9]{4}-' | sort | tail -1); [ -n "$last" ] && echo "$ns|$id|$last"
+        done; done
+      register: s
+      changed_when: false
+    - ansible.builtin.set_fact:
+        snaps: "{{ s.stdout_lines | map('split','|') | list }}"
+
+- name: Firewalls - system + interface link states (read-only API)
+  hosts: firewalls
+  gather_facts: false
+  connection: local
+  tasks:
+    - ansible.builtin.meta: end_host
+      when: pan_api_key is not defined
+    - ansible.builtin.shell: |
+        C="curl -sS -k --max-time 30 --pinnedpubkey {{ pan_pin }} -H X-PAN-KEY:$PANKEY"
+        $C "https://{{ ansible_host }}/api/?type=op&cmd=<show><system><info></info></system></show>" | grep -oE '<uptime>[^<]*' | sed 's/<uptime>/uptime=/'
+        $C "https://{{ ansible_host }}/api/?type=op&cmd=<show><interface>all</interface></show>" | python3 -c '
+        import sys, xml.etree.ElementTree as ET
+        r = ET.parse(sys.stdin).getroot()
+        for e in r.iter("entry"):
+            n, st = e.findtext("name"), e.findtext("state")
+            if n and st: print("if=%s|%s" % (n, st))'
+      environment: { PANKEY: "{{ pan_api_key }}" }
+      register: f
+      changed_when: false
+      failed_when: false
+      no_log: true
+    - ansible.builtin.set_fact:
+        fwinfo:
+          reachable: "{{ f.rc == 0 and (f.stdout_lines | select('match','^uptime=') | list | length > 0) }}"
+          uptime: "{{ (f.stdout_lines | select('match','^uptime=') | first | default('uptime=?')).split('=')[1] }}"
+          links: "{{ dict(f.stdout_lines | select('match','^if=') | map('regex_replace','^if=','') | map('split','|')) }}"
+
+- name: Tools - services running and data flowing
+  hosts: zabbix-01:wazuh-01:wazuh-02:pbs-01:portal-01:ctl-01
+  become: "{{ inventory_hostname != 'ctl-01' }}"   # ctl-01 runs unattended without sudo
+  gather_facts: false
+  ignore_unreachable: true
+  vars:
+    cfg: "{{ lookup('file', playbook_dir + '/../checklist/daily-checklist.yml') | from_yaml }}"
+    mine: "{{ cfg.sites.values() | map(attribute='tools', default=[]) | flatten | selectattr('host', 'equalto', inventory_hostname) | list }}"
+  tasks:
+    - ansible.builtin.shell: |
+        {% for t in mine %}{% for s in t.services %}echo "svc={{ s }}|$(systemctl is-active {{ s }} 2>/dev/null)"
+        {% endfor %}{% if t.data_file is defined %}f={{ t.data_file }}; [ -f $f ] && echo "age=$(( ($(date +%s) - $(stat -c %Y $f)) / 60 ))" || echo "age=-1"
+        {% endif %}{% endfor %}
+        true
+      register: tl
+      changed_when: false
+      when: mine | length > 0
+    - ansible.builtin.set_fact:
+        toolinfo:
+          reachable: true
+          services: "{{ dict(tl.stdout_lines | default([]) | select('match','^svc=') | map('regex_replace','^svc=','') | map('split','|')) }}"
+          data_age_min: "{{ (tl.stdout_lines | default([]) | select('match','^age=') | first | default('age=') ).split('=')[1] }}"
+      when: mine | length > 0
+
+- name: Assemble evidence + render sheets
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  vars:
+    cfg: "{{ lookup('file', playbook_dir + '/../checklist/daily-checklist.yml') | from_yaml }}"
+    day: "{{ lookup('pipe', 'date +%F') }}"
+    edir: "{{ playbook_dir }}/../../docs/evidence/daily-checks/{{ day[:4] }}/{{ day[5:7] }}"
+    ping_targets: >-
+      {{ (cfg.sites.values() | map(attribute='ap_ips') | flatten)
+         + (cfg.sites.values() | map(attribute='other_ips') | flatten)
+         + (cfg.sites.values() | selectattr('firewall.type','equalto','ping') | map(attribute='firewall.ip') | list)
+         + (cfg.sites.values() | map(attribute='switches') | flatten | map('extract', hostvars, 'ansible_host') | list) }}
+  tasks:
+    - name: Ping devices (2 tries each)
+      ansible.builtin.shell: |
+        for ip in {{ ping_targets | join(' ') }}; do ping -c2 -W1 -q $ip >/dev/null 2>&1 && echo "$ip|up" || echo "$ip|down"; done
+      register: p
+      changed_when: false
+
+    - name: Evidence folder
+      ansible.builtin.file: { path: "{{ edir }}", state: directory, mode: "0755" }
+
+    - name: Write raw evidence (JSON)
+      ansible.builtin.copy:
+        dest: "{{ edir }}/{{ day }}.json"
+        mode: "0644"
+        content: >-
+          {{ {
+            'date': day,
+            'generated_at': lookup('pipe', 'date -Is'),
+            'generated_by': 'ctl-01 daily-check.yml (automated, read-only)',
+            'hosts': dict((groups['pve'] + groups['pbs']) | zip((groups['pve'] + groups['pbs']) | map('extract', hostvars) | map(attribute='hinfo', default={'reachable': false}))),
+            'pbs_snapshots': hostvars[groups['pbs'][0]].snaps | default([]),
+            'pbs_ns': dict(groups['pve'] | zip(groups['pve'] | map('extract', hostvars) | map(attribute='pbs_ns', default=''))),
+            'firewalls': dict(groups['firewalls'] | zip(groups['firewalls'] | map('extract', hostvars) | map(attribute='fwinfo', default={'reachable': false}))),
+            'switch_ips': dict(cfg.sites.values() | map(attribute='switches') | flatten | zip(cfg.sites.values() | map(attribute='switches') | flatten | map('extract', hostvars, 'ansible_host'))),
+            'pings': dict(p.stdout_lines | map('split','|')),
+            'tools': dict(cfg.sites.values() | map(attribute='tools', default=[]) | flatten | map(attribute='host') | unique | zip(
+                       cfg.sites.values() | map(attribute='tools', default=[]) | flatten | map(attribute='host') | unique | map('extract', hostvars) | map(attribute='toolinfo', default={'reachable': false})))
+          } | to_nice_json }}
+
+    - name: Checksum + render per-company sheets (daily + month view)
+      ansible.builtin.shell: |
+        cd "{{ edir }}" && sha256sum "{{ day }}.json" > "{{ day }}.json.sha256"
+        python3 "{{ playbook_dir }}/../../tools/checklist_render.py" "{{ playbook_dir }}/../checklist/daily-checklist.yml" "{{ edir }}/{{ day }}.json"
+      register: r
+    - ansible.builtin.debug: { var: r.stdout_lines }

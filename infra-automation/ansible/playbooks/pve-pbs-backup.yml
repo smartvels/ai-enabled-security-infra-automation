@@ -1,0 +1,153 @@
+# pve-pbs-backup.yml - every Proxmox host backs up ALL guests daily to the PBS, into ITS OWN namespace,
+# with ITS OWN backup-only token (role DatastoreBackup on that namespace: can back up + restore its own,
+# cannot prune/delete, cannot see other hosts). Retention stays central on the PBS (prune job daily-keep-60).
+#   ansible-playbook playbooks/pve-pbs-backup.yml -l 'pbs-01,hv-a2'            # pilot (PBS + one host)
+#   ansible-playbook playbooks/pve-pbs-backup.yml                            # all hosts
+#   ... -e run_now=true                                                      # also start a backup now
+# Secrets: token values exist only in memory (no_log) and in each host's /etc/pve/priv/storage/<id>.pw.
+- name: PBS - namespaces, users, backup-only tokens
+  hosts: pbs
+  gather_facts: false
+  vars:
+    ds: backup
+  tasks:
+    - name: Which PVE hosts are in this run (respects -l)
+      ansible.builtin.set_fact:
+        run_hosts: >-
+          {{ (lookup('ansible.builtin.inventory_hostnames', ansible_limit).split(',') if (ansible_limit | default('')) | length > 0 else groups['pve'])
+             | select('in', groups['pve']) | list }}
+    - ansible.builtin.debug: { msg: "hosts in this run: {{ run_hosts }}" }
+
+    - name: PBS fingerprint
+      ansible.builtin.shell: |
+        proxmox-backup-manager cert info | awk -F': ' '/Fingerprint/{print $2}'
+      register: fpr
+      changed_when: false
+
+    - name: Namespace per host (idempotent)
+      ansible.builtin.shell: |
+        ls -d /backup/datastore/ns/{{ hostvars[item].pbs_ns | default(item) }} >/dev/null 2>&1 && echo exists && exit 0
+        proxmox-backup-debug api create /admin/datastore/{{ ds }}/namespace --name {{ hostvars[item].pbs_ns | default(item) }} --output-format json >/dev/null 2>&1; ls -d /backup/datastore/ns/{{ hostvars[item].pbs_ns | default(item) }} >/dev/null && echo created
+      loop: "{{ run_hosts }}"
+      register: nsr
+      changed_when: "'created' in nsr.stdout"
+
+    - name: User per host
+      ansible.builtin.shell: |
+        proxmox-backup-manager user list --output-format json | grep -q '"userid":"pve-{{ item }}@pbs"' && echo exists && exit 0
+        proxmox-backup-manager user create pve-{{ item }}@pbs --comment "backup-only account for {{ item }} (ctl-01)" && echo created
+      loop: "{{ run_hosts }}"
+      register: ur
+      changed_when: "'created' in ur.stdout"
+
+    - name: Fresh token per host (old one with the same name is replaced)
+      ansible.builtin.shell: |
+        proxmox-backup-manager user delete-token pve-{{ item }}@pbs {{ item }} >/dev/null 2>&1 || true
+        proxmox-backup-manager user generate-token pve-{{ item }}@pbs {{ item }} | sed -n 's/.*"value": *"\([^"]*\)".*/\1/p'
+      loop: "{{ run_hosts }}"
+      register: tok
+      no_log: true
+
+    - name: ACL - DatastoreBackup on its own namespace only (user + token)
+      ansible.builtin.shell: |
+        proxmox-backup-manager acl update /datastore/{{ ds }}/{{ hostvars[item].pbs_ns | default(item) }} DatastoreBackup --auth-id pve-{{ item }}@pbs
+        proxmox-backup-manager acl update /datastore/{{ ds }}/{{ hostvars[item].pbs_ns | default(item) }} DatastoreBackup --auth-id 'pve-{{ item }}@pbs!{{ item }}'
+      loop: "{{ run_hosts }}"
+      changed_when: true
+
+    - name: Keep secrets in memory for the next play
+      ansible.builtin.set_fact:
+        pbs_tokens: "{{ pbs_tokens | default({}) | combine({ item.item: (item.stdout | trim) }) }}"
+        pbs_fpr: "{{ fpr.stdout | trim }}"
+      loop: "{{ tok.results }}"
+      no_log: true
+
+- name: PVE - storage on own token + namespace, daily job for all guests
+  hosts: pve
+  gather_facts: false
+  vars:
+    pbs_ip: 10.10.1.30
+    ds: backup
+    mail: itteam@example.com
+    pbs_host: "{{ groups['pbs'][0] }}"
+    my_secret: "{{ hostvars[pbs_host].pbs_tokens[inventory_hostname] }}"
+    my_user: "pve-{{ inventory_hostname }}@pbs!{{ inventory_hostname }}"
+  tasks:
+    - name: Skip hosts without a fresh token (not in this run)
+      ansible.builtin.meta: end_host
+      when: inventory_hostname not in (hostvars[pbs_host].pbs_tokens | default({}))
+
+    - name: Find the PBS storage on this host
+      ansible.builtin.shell: |
+        awk -v ip="{{ pbs_ip }}" '/^[a-z]+: /{id=""} /^pbs: /{id=$2} /^[[:space:]]+server /{ if (($2==ip || $2 ~ /pbs-01/) && id!="") {print id; exit} }' /etc/pve/storage.cfg
+      register: sid
+      changed_when: false
+
+    - name: Backup copies of storage + jobs config
+      ansible.builtin.shell: |
+        TS=$(date +%F-%H%M); cp -a /etc/pve/storage.cfg /root/storage.cfg.bak-$TS; [ -f /etc/pve/jobs.cfg ] && cp -a /etc/pve/jobs.cfg /root/jobs.cfg.bak-$TS || true
+
+    - name: Create PBS storage if the host has none
+      ansible.builtin.shell: |
+        pvesm add pbs pbs-store --server {{ pbs_ip }} --datastore {{ ds }} --username '{{ my_user }}' --password "$PW" \
+          --fingerprint '{{ hostvars[pbs_host].pbs_fpr }}' --namespace {{ pbs_ns | default(inventory_hostname) }} --content backup
+      environment: { PW: "{{ my_secret }}" }
+      when: sid.stdout | trim == ''
+      no_log: true
+
+    - ansible.builtin.set_fact:
+        storage_id: "{{ (sid.stdout | trim) if (sid.stdout | trim) != '' else 'pbs-store' }}"
+
+    - name: Point existing storage at its own token + namespace (secret via password file only)
+      ansible.builtin.shell: |
+        set -e
+        umask 077; printf '%s' "$PW" > /etc/pve/priv/storage/{{ storage_id }}.pw
+        pvesm set {{ storage_id }} --username '{{ my_user }}' --namespace {{ pbs_ns | default(inventory_hostname) }} --fingerprint '{{ hostvars[pbs_host].pbs_fpr }}'
+      environment: { PW: "{{ my_secret }}" }
+      when: sid.stdout | trim != ''
+      no_log: true
+
+    - name: Storage must be active
+      ansible.builtin.shell: sleep 2; pvesm status --storage {{ storage_id }} | tail -1
+      register: st
+      changed_when: false
+      failed_when: "' active ' not in st.stdout"
+
+    - name: Existing backup jobs on this host (recorded before replacement)
+      ansible.builtin.shell: |
+        pvesh get /cluster/backup --output-format json | python3 -c "
+        import json,sys
+        for j in json.load(sys.stdin):
+            print(j['id'], '| storage', j.get('storage'), '| schedule', j.get('schedule'), '| all' if str(j.get('all',0))=='1' else '| vmid ' + str(j.get('vmid','')), '| enabled', j.get('enabled',1))"
+      register: oldjobs
+      changed_when: false
+    - ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} existing jobs (to be replaced): {{ oldjobs.stdout_lines | default(['none']) }}"
+
+    - name: Remove ALL existing backup jobs (definitions only - existing backups are not touched)
+      ansible.builtin.shell: |
+        for j in $(pvesh get /cluster/backup --output-format json | python3 -c "import json,sys; [print(j['id']) for j in json.load(sys.stdin)]"); do
+          pvesh delete /cluster/backup/$j && echo "removed job $j"
+        done
+      register: rmjobs
+      changed_when: rmjobs.stdout | length > 0
+      when: replace_jobs | default(true) | bool
+
+    - name: Create the ONE standard job (all guests -> own namespace, daily, failure mail)
+      ansible.builtin.shell: |
+        pvesh create /cluster/backup --storage {{ storage_id }} --all 1 {{ ('--exclude ' + (backup_exclude | map('string') | join(','))) if (backup_exclude | default([])) else '' }} \
+          --schedule {{ backup_time | default('23:45') }} --enabled 1 --mode snapshot --compress zstd \
+          --mailto {{ mail }} --mailnotification failure --notification-mode legacy-sendmail --prune-backups keep-all=1 \
+          --notes-template '{{ '{{' }}guestname{{ '}}' }}' --comment "standard: all guests -> PBS ns {{ pbs_ns | default(inventory_hostname) }} (ctl-01)" >/dev/null
+        pvesh get /cluster/backup --output-format json | python3 -c "import json,sys; j=json.load(sys.stdin); print(len(j), 'job(s):', ', '.join(x['id']+' '+str(x.get('schedule')) for x in j))"
+      register: job
+
+    - name: Optional - start a backup of all guests now (background, visible in GUI tasks)
+      ansible.builtin.shell: |
+        nohup vzdump --all 1 --storage {{ storage_id }} --mode snapshot --compress zstd --mailto {{ mail }} --mailnotification failure \
+          --notes-template '{{ '{{' }}guestname{{ '}}' }}' > /root/vzdump-now-$(date +%F-%H%M).log 2>&1 &
+        echo started
+      when: run_now | default(false) | bool
+
+    - ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: storage {{ storage_id }} active, job {{ job.stdout }}, daily {{ backup_time | default('23:45') }}{{ ', backup started now' if (run_now | default(false) | bool) else '' }}"

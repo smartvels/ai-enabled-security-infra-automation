@@ -5,7 +5,7 @@ gunicorn==23.0.0
 # Transitive dependencies, pinned so every build installs exactly the same
 # versions (taken from the build's SBOM). Update deliberately, then re-run CI.
 blinker==1.9.0
-certifi==2026.7.22
+certifi==2026.10.19
 charset-normalizer==3.5.2
 click==8.5.0
 idna==3.20

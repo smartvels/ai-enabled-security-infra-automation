@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.2.0 (2026-10)
+
+### Infrastructure automation (`infra-automation/`)
+- Guarded firewall changes: pending-change check, prechecks, snapshot, candidate diff,
+  validation, partial commit, postchecks and automatic rollback
+- Guarded Active Directory changes with safety checks, verification and rollback file
+- Nightly encrypted firewall config backups with diffs; read-only VPN tunnel diagnostics
+- Backup-only hypervisor tokens, backup coverage report, tamper-resistant 180-day log archive
+- Daily infrastructure checklist with checksummed evidence; daily read-only AD report
+- Request → approval → execution runner; the portal never holds credentials
+- Security-only unattended updates and package change records
+- Wazuh agent install, rename, registration, coverage report and guarded server upgrade
+- Change IDs and target names validated; git calls made without a shell
+- All names, addresses and domains are placeholders
+
 ## v1.1.0 (2026-10)
 
 ### Threat intelligence enrichment

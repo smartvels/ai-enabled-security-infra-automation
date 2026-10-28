@@ -1,0 +1,4 @@
+# approvers.yml - portal usernames allowed to approve, per risk. Kept on the control server (git), NOT in the portal,
+# so a compromised portal cannot add approvers. A requester can never approve their own request.
+normal: [approver.one, approver.two]
+high:   [approver.one, approver.two]      # high risk needs 2 different approvers

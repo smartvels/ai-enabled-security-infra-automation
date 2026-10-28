@@ -1,0 +1,7 @@
+[Unit]
+Description=Package change register timer
+[Timer]
+OnCalendar=*-*-* 06:45:00
+Persistent=true
+[Install]
+WantedBy=timers.target
