@@ -1,0 +1,107 @@
+# pan-backup.yml (v2) - READ-ONLY Palo Alto: system info, encrypted running-config backup with change detection,
+# optional encrypted DEVICE-STATE export, and a strict negative (cannot-write) test.
+#   ansible-playbook playbooks/pan-backup.yml -l pa-site-a                       # config backup + change check
+#   ansible-playbook playbooks/pan-backup.yml -l pa-site-a --tags devicestate    # + device-state export
+#   ansible-playbook playbooks/pan-backup.yml -l pa-site-a --tags negative       # prove it cannot write
+# TLS: public-key pinning (pan_pin). API key only in a header, never in a URL, never logged.
+# Storage: ~/infra/backups/paloalto/<host>/ as ansible-vault files (vault id ro) - contents include hashes/keys.
+- name: Palo Alto read-only backup
+  hosts: firewalls
+  gather_facts: false
+  connection: local
+  vars:
+    vault_args: "--vault-id ro@{{ lookup('env','HOME') }}/.ansible-vault/ro.pass --encrypt-vault-id ro"
+    bdir: "{{ playbook_dir }}/../../backups/paloalto/{{ inventory_hostname }}"
+    curl: "curl -sS -f -k --max-time 120 --pinnedpubkey '{{ pan_pin }}' -H \"X-PAN-KEY: $PANKEY\""
+  tasks:
+    - name: Only PAN-OS hosts with an API key
+      ansible.builtin.meta: end_host
+      when: pan_api_key is not defined or device_os | default('') != 'panos'
+      tags: [always]
+    - name: Pin and key must be real (not empty)
+      ansible.builtin.assert:
+        that:
+          - pan_pin is match('^sha256//[A-Za-z0-9+/]{43}=$')
+          - pan_api_key | length > 40
+        fail_msg: "pan_pin or pan_api_key missing/empty for {{ inventory_hostname }} - redo onboarding stage 2"
+      no_log: true
+      tags: [always]
+
+    - name: System info (must return the device identity)
+      ansible.builtin.shell: |
+        set -o pipefail
+        {{ curl }} "https://{{ ansible_host }}/api/?type=op&cmd=<show><system><info></info></system></show>" \
+          | grep -oE '<(hostname|model|serial|sw-version)>[^<]*' | sed 's/<//;s/>/: /'
+      args: { executable: /bin/bash }
+      environment: { PANKEY: "{{ pan_api_key }}" }
+      register: info
+      changed_when: false
+      failed_when: info.rc != 0 or 'serial:' not in info.stdout
+      tags: [always]
+    - ansible.builtin.debug: { var: info.stdout_lines }
+      tags: [always]
+
+    - name: NEGATIVE TEST - try to create a harmless tag in the candidate config (must be refused)
+      ansible.builtin.shell: |
+        set -o pipefail
+        curl -sS -k --max-time 60 --pinnedpubkey '{{ pan_pin }}' -H "X-PAN-KEY: $PANKEY" -G "https://{{ ansible_host }}/api/" \
+          --data-urlencode "type=config" --data-urlencode "action=set" \
+          --data-urlencode "xpath=/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/tag" \
+          --data-urlencode "element=<entry name='ctl01-ro-test'/>"
+      args: { executable: /bin/bash }
+      environment: { PANKEY: "{{ pan_api_key }}" }
+      register: neg
+      changed_when: false
+      failed_when: neg.rc != 0 or 'not authorized' not in neg.stdout
+      tags: [never, negative]
+    - ansible.builtin.debug:
+        msg: "Write refused as expected: {{ neg.stdout | regex_search('<msg>.*</msg>') }}"
+      tags: [never, negative]
+
+    - name: Running config -> RAM -> encrypted backup if changed (+ encrypted diff)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        umask 077; mkdir -p "{{ bdir }}"; T=$(mktemp -d /dev/shm/pan.XXXXXX); trap 'find "$T" -type f -exec shred -u {} +; rm -rf "$T"' EXIT
+        {{ curl }} "https://{{ ansible_host }}/api/?type=export&category=configuration" -o "$T/cfg.xml" || true
+        if ! head -c 300 "$T/cfg.xml" 2>/dev/null | grep -q '<config'; then
+          {{ curl }} "https://{{ ansible_host }}/api/?type=op&cmd=<show><config><running></running></config></show>" -o "$T/cfg.xml"
+          head -c 300 "$T/cfg.xml" | grep -q '<config' || { echo "ERROR: could not read config:"; head -c 300 "$T/cfg.xml"; exit 1; }
+        fi
+        NEW=$(sha256sum "$T/cfg.xml" | cut -d' ' -f1); OLD=$(cat "{{ bdir }}/latest.sha256" 2>/dev/null || true)
+        if [ "$NEW" = "$OLD" ]; then echo "{{ inventory_hostname }}: CONFIG UNCHANGED since last backup"; exit 0; fi
+        TS=$(date -u +%Y%m%dT%H%M%SZ); PREV=$(ls -1 "{{ bdir }}"/*.xml.vault 2>/dev/null | sort | tail -1 || true)
+        ansible-vault encrypt {{ vault_args }} --output "{{ bdir }}/$TS.xml.vault" "$T/cfg.xml" >/dev/null
+        if [ -n "$PREV" ]; then
+          ansible-vault view --vault-id ro@{{ lookup('env','HOME') }}/.ansible-vault/ro.pass "$PREV" > "$T/prev.xml" 2>/dev/null
+          diff -u "$T/prev.xml" "$T/cfg.xml" > "$T/diff.txt" || true
+          ansible-vault encrypt {{ vault_args }} --output "{{ bdir }}/$TS.diff.vault" "$T/diff.txt" >/dev/null
+          echo "{{ inventory_hostname }}: CONFIG CHANGED: +$(grep -c '^+[^+]' "$T/diff.txt" || true) / -$(grep -c '^-[^-]' "$T/diff.txt" || true) lines vs $(basename "$PREV")"
+        else echo "{{ inventory_hostname }}: FIRST CONFIG BACKUP stored: $TS.xml.vault"; fi
+        echo "$NEW" > "{{ bdir }}/latest.sha256"
+      args: { executable: /bin/bash }
+      environment: { PANKEY: "{{ pan_api_key }}" }
+      register: bk
+      changed_when: "'UNCHANGED' not in bk.stdout"
+    - ansible.builtin.debug: { var: bk.stdout_lines }
+
+    - name: Device-state export (config + certificates/keys bundle) -> encrypted
+      ansible.builtin.shell: |
+        set -euo pipefail
+        umask 077; mkdir -p "{{ bdir }}/device-state"; T=$(mktemp -d /dev/shm/pands.XXXXXX); trap 'find "$T" -type f -exec shred -u {} +; rm -rf "$T"' EXIT
+        curl -sS -k --max-time 300 --pinnedpubkey '{{ pan_pin }}' -H "X-PAN-KEY: $PANKEY" \
+          "https://{{ ansible_host }}/api/?type=export&category=device-state" -o "$T/ds.tgz"
+        if ! tar -tzf "$T/ds.tgz" >/dev/null 2>&1; then
+          echo "{{ inventory_hostname }}: DEVICE-STATE NOT EXPORTED - firewall replied:"; head -c 400 "$T/ds.tgz"; echo; exit 2
+        fi
+        TS=$(date -u +%Y%m%dT%H%M%SZ)
+        ansible-vault encrypt {{ vault_args }} --output "{{ bdir }}/device-state/$TS.tgz.vault" "$T/ds.tgz" >/dev/null
+        echo "{{ inventory_hostname }}: DEVICE-STATE stored: device-state/$TS.tgz.vault ($(du -h "$T/ds.tgz" | cut -f1), $(tar -tzf "$T/ds.tgz" | wc -l) files)"
+        ls -1 "{{ bdir }}/device-state"/*.tgz.vault | sort | head -n -12 | xargs -r rm -f
+      args: { executable: /bin/bash }
+      environment: { PANKEY: "{{ pan_api_key }}" }
+      register: ds
+      failed_when: ds.rc not in [0, 2]
+      changed_when: ds.rc == 0
+      tags: [never, devicestate]
+    - ansible.builtin.debug: { var: ds.stdout_lines }
+      tags: [never, devicestate]

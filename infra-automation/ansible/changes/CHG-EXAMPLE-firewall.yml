@@ -1,0 +1,14 @@
+# Example guarded firewall change for tools/pan_change.py (names/values are placeholders).
+id: CHG-EXAMPLE-01
+firewall: pa-site-a
+reason: "Disable a tunnel monitor that probes a non-existent host (false failover)"
+prechecks:
+  - { name: "peer site firewall reachable", shell: "ping -c3 -W2 10.10.2.1" }
+operations:
+  - action: set
+    xpath: "/config/devices/entry[@name='localhost.localdomain']/network/tunnel/ipsec/entry[@name='TUNNEL_A_TO_B']/tunnel-monitor"
+    element: "<enable>no</enable>"
+postchecks:
+  - { name: "peer site hosts reachable", shell: "sleep 60; ping -c2 -W2 10.10.2.1", retries: 3, wait: 30 }
+  - { name: "no tunnel-down events after settling", no_syslog: { eventid: tunnel-status-down, match: [TUNNEL_A_TO_B], settle_minutes: 3, observe_minutes: 10 } }
+  - { name: "read-only API still answers", api_ok: true }

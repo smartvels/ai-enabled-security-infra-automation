@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Palo Alto backup at 02:30 (device-state on the 1st)
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

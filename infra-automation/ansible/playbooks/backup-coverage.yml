@@ -1,0 +1,113 @@
+# backup-coverage.yml - READ-ONLY report: does every guest have a recent PBS backup? + firewall config backups.
+#   ansible-playbook playbooks/backup-coverage.yml                 # default: OK if newer than 26 h
+#   ansible-playbook playbooks/backup-coverage.yml -e max_age_h=48
+# Output: summary on screen + ~/infra/docs/reports/backup-coverage-<date>.csv ; non-zero exit if any gap.
+- name: Guests per Proxmox host
+  hosts: pve
+  gather_facts: false
+  tasks:
+    - name: List VMs and containers (with template flag)
+      ansible.builtin.shell: |
+        n=$(hostname)
+        for t in qemu lxc; do
+          pvesh get /nodes/$n/$t --output-format json | python3 -c "
+        import json,sys
+        for g in json.load(sys.stdin):
+            print('$t', g['vmid'], g.get('name','-'), g.get('status','-'), g.get('template',0))"
+        done
+      register: g
+      changed_when: false
+    - ansible.builtin.set_fact:
+        guests: "{{ g.stdout_lines | map('split') | list }}"
+
+- name: Latest snapshot per guest on the PBS (per namespace)
+  hosts: pbs
+  gather_facts: false
+  tasks:
+    - name: Newest snapshot timestamp per ns/type/id
+      ansible.builtin.shell: |
+        cd /backup/datastore/ns 2>/dev/null || exit 0
+        for ns in */; do ns=${ns%/}
+          for t in vm ct; do [ -d "$ns/$t" ] || continue
+            for id in $(ls "$ns/$t"); do
+              last=$(ls -1 "$ns/$t/$id" | grep -E '^[0-9]{4}-' | sort | tail -1)
+              [ -n "$last" ] && echo "$ns $t $id $last"
+            done
+          done
+        done
+      register: snaps
+      changed_when: false
+    - ansible.builtin.set_fact:
+        latest: "{{ snaps.stdout_lines | map('split') | list }}"
+
+- name: Report
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  vars:
+    max_age_h: 26
+    now_epoch: "{{ lookup('pipe', 'date -u +%s') | int }}"
+    out_dir: "{{ playbook_dir }}/../../docs/reports"
+    pbs_host: "{{ groups['pbs'][0] }}"
+  tasks:
+    - name: Build rows
+      ansible.builtin.set_fact:
+        rows: >-
+          {%- set r = [] -%}
+          {%- set snap = {} -%}
+          {%- for s in hostvars[pbs_host].latest | default([]) -%}{%- set _ = snap.update({ s[0] ~ '/' ~ s[1] ~ '/' ~ s[2]: s[3] }) -%}{%- endfor -%}
+          {%- for h in groups['pve'] -%}
+            {%- set ns = hostvars[h].pbs_ns | default(h) -%}
+            {%- set excl = hostvars[h].backup_exclude | default([]) | map('string') | list -%}
+            {%- for gst in hostvars[h].guests | default([]) -%}
+              {%- set kind = 'vm' if gst[0] == 'qemu' else 'ct' -%}
+              {%- set ts = snap.get(ns ~ '/' ~ kind ~ '/' ~ gst[1], '') -%}
+              {%- if gst[4] | string == '1' -%}{%- set st = 'TEMPLATE' -%}
+              {%- elif gst[1] in excl -%}{%- set st = 'EXCLUDED' -%}
+              {%- elif not ts -%}{%- set st = 'MISSING' -%}
+              {%- else -%}
+                {%- set age = ((now_epoch | int) - (ts | to_datetime('%Y-%m-%dT%H:%M:%SZ')).strftime('%s') | int) / 3600 -%}
+                {%- set st = 'OK' if age <= (max_age_h | int) else 'STALE' -%}
+              {%- endif -%}
+              {%- set _ = r.append({'host': h, 'ns': ns, 'type': kind, 'vmid': gst[1], 'name': gst[2], 'power': gst[3], 'last_backup_utc': ts, 'status': st}) -%}
+            {%- endfor -%}
+          {%- endfor -%}
+          {{ r }}
+
+    - name: Palo Alto config backups (newest file + last run result)
+      ansible.builtin.shell: |
+        cd {{ playbook_dir }}/../../backups/paloalto 2>/dev/null || { echo "no firewall backups dir"; exit 0; }
+        for fw in */; do fw=${fw%/}
+          c=$(ls -1t $fw/*.xml.vault 2>/dev/null | head -1); d=$(ls -1t $fw/device-state/*.tgz.vault 2>/dev/null | head -1)
+          echo "$fw | newest config backup: $(basename "${c:-none}") | newest device-state: $(basename "${d:-none}")"
+        done
+        echo "--- last pan-backup runs (journal, 26 h):"
+        journalctl -t pan-backup --since "-26h" --no-pager -o cat 2>/dev/null | tail -4 || echo "(no journal access)"
+      register: fw
+      changed_when: false
+
+    - name: Write CSV
+      ansible.builtin.copy:
+        dest: "{{ out_dir }}/backup-coverage-{{ lookup('pipe','date +%F') }}.csv"
+        content: |
+          host,namespace,type,vmid,name,power,last_backup_utc,status
+          {% for x in rows | sort(attribute='status') %}
+          {{ x.host }},{{ x.ns }},{{ x.type }},{{ x.vmid }},{{ x.name }},{{ x.power }},{{ x.last_backup_utc }},{{ x.status }}
+          {% endfor %}
+        mode: "0644"
+      register: csvf
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "guests: {{ rows | length }} | OK: {{ rows | selectattr('status','equalto','OK') | list | length }} | STALE: {{ rows | selectattr('status','equalto','STALE') | list | length }} | MISSING: {{ rows | selectattr('status','equalto','MISSING') | list | length }} | EXCLUDED: {{ rows | selectattr('status','equalto','EXCLUDED') | list | length }} | TEMPLATE: {{ rows | selectattr('status','equalto','TEMPLATE') | list | length }}"
+          - "GAPS (STALE/MISSING):"
+          - "{{ rows | selectattr('status','in',['STALE','MISSING']) | map(attribute='host') | zip(rows | selectattr('status','in',['STALE','MISSING']) | map(attribute='vmid'), rows | selectattr('status','in',['STALE','MISSING']) | map(attribute='name'), rows | selectattr('status','in',['STALE','MISSING']) | map(attribute='status')) | map('join',' ') | list }}"
+          - "CSV: {{ csvf.dest }}"
+          - "FIREWALLS:"
+          - "{{ fw.stdout_lines }}"
+
+    - name: Fail if there are gaps (for alerting when run on a timer)
+      ansible.builtin.fail:
+        msg: "Backup gaps found - see list above"
+      when: rows | selectattr('status','in',['STALE','MISSING']) | list | length > 0

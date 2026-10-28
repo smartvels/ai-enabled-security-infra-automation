@@ -1,0 +1,111 @@
+# wazuh-coverage.yml - READ-ONLY: which inventory devices send logs to Wazuh today, and which log types.
+#   ansible-playbook playbooks/wazuh-coverage.yml
+# Checks: syslog sources (by IP) in today's raw archives on both Wazuh nodes, Palo Alto log types
+# (TRAFFIC/THREAT/SYSTEM/CONFIG/GLOBALPROTECT/USERID/...), agents (name, IP, status).
+# Output: table on screen + ~/infra/docs/reports/wazuh-coverage-<date>.csv
+- name: Count today's raw events per source on each Wazuh node
+  hosts: wazuh-01,wazuh-02
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Aggregate archives.json (streaming, read-only)
+      ansible.builtin.shell: |
+        /var/ossec/framework/python/bin/python3 - <<'PY'
+        import json, re, collections
+        types = ("TRAFFIC","THREAT","SYSTEM","CONFIG","GLOBALPROTECT","USERID","HIPMATCH","DECRYPTION","AUTHENTICATION","IPTAG","URL")
+        src = collections.defaultdict(lambda: {"events": 0, "types": collections.Counter(), "agent": ""})
+        try:
+            with open("/var/ossec/logs/archives/archives.json", errors="replace") as f:
+                for line in f:
+                    try: e = json.loads(line)
+                    except Exception: continue
+                    a = e.get("agent", {}); name = a.get("name", "")
+                    loc = e.get("location", "")
+                    key = loc if re.match(r"^\d+\.\d+\.\d+\.\d+$", loc) else ("agent:" + name)
+                    s = src[key]; s["events"] += 1; s["agent"] = name
+                    if key[0].isdigit():
+                        fl = e.get("full_log", "")
+                        for t in types:
+                            if "," + t + "," in fl[:300]:
+                                s["types"][t] += 1; break
+        except FileNotFoundError:
+            pass
+        print(json.dumps({k: {"events": v["events"], "types": dict(v["types"]), "agent": v["agent"]} for k, v in src.items()}))
+        PY
+      register: agg
+      changed_when: false
+    - ansible.builtin.set_fact:
+        sources: "{{ agg.stdout | from_json }}"
+
+- name: Agent list from the master
+  hosts: wazuh-01
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.shell: /var/ossec/bin/agent_control -l | grep -E 'ID:'
+      register: al
+      changed_when: false
+    - ansible.builtin.set_fact:
+        agents: >-
+          {{ al.stdout_lines | map('regex_replace', '^\s*ID: ([0-9]+), Name: (.*), IP: ([^,]+), (.*)$', '\2|\3|\4') | map('split', '|') | list }}
+
+- name: Coverage report
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  vars:
+    out_dir: "{{ playbook_dir }}/../../docs/reports"
+    expected: >-
+      {{ (groups['network'] | default([])) + (groups['windows_dc'] | default([])) + (groups['pve'] | default([])) + (groups['pbs'] | default([])) }}
+  tasks:
+    - name: Merge sources from both nodes
+      ansible.builtin.set_fact:
+        allsrc: "{{ hostvars['wazuh-01'].sources | combine(hostvars['wazuh-02'].sources, recursive=true, list_merge='append') }}"
+        agents: "{{ hostvars['wazuh-01'].agents }}"
+
+    - name: Build rows per inventory device
+      ansible.builtin.set_fact:
+        rows: >-
+          {%- set r = [] -%}
+          {%- for h in expected -%}
+            {%- set hv = hostvars[h] -%}
+            {%- set ip = hv.pve_api_host | default(hv.pbs_api_host | default(hv.ansible_host | default(''))) -%}
+            {%- set ips = [ip] + (hv.syslog_sources | default([])) -%}
+            {%- set ev = namespace(n=0, types={}) -%}
+            {%- for i in ips -%}{%- if i in allsrc -%}{%- set ev.n = ev.n + allsrc[i].events -%}{%- set ev.types = ev.types | combine(allsrc[i].types) -%}{%- endif -%}{%- endfor -%}
+            {%- set ag = agents | selectattr(1, 'in', ips) | list -%}
+            {%- set agn = agents | selectattr(0, 'search', '(?i)^' ~ (hv.wazuh_agent_name | default(h) | regex_escape) ~ '$') | list -%}
+            {%- set tl = [] -%}{%- for k in ev.types | dict2items -%}{%- set _ = tl.append(k.key ~ '=' ~ k.value) -%}{%- endfor -%}
+            {%- set agt = (ag + agn) | map('join', ' ') | list -%}
+            {%- set status = 'OK' if ev.n > 0 or (agt | select('search', 'Active') | list) else 'NO LOGS' -%}
+            {%- set _ = r.append({'device': h, 'ip': ip, 'syslog_events_today': ev.n, 'pa_types': tl | join(' '), 'agent': agt | join('; '), 'status': status}) -%}
+          {%- endfor -%}
+          {{ r }}
+
+    - name: Unmatched syslog sources (not in inventory) - top 15 by volume
+      ansible.builtin.set_fact:
+        unmatched: >-
+          {{ (allsrc | dict2items | rejectattr('key', 'in', rows | map(attribute='ip') | list)
+              | selectattr('key', 'match', '^[0-9]') | sort(attribute='value.events', reverse=true) | list)[:15]
+              | map(attribute='key') | list }}
+
+    - name: Reports folder
+      ansible.builtin.file: { path: "{{ out_dir }}", state: directory, mode: "0755" }
+    - name: Write CSV
+      ansible.builtin.copy:
+        dest: "{{ out_dir }}/wazuh-coverage-{{ lookup('pipe','date +%F') }}.csv"
+        mode: "0644"
+        content: |
+          device,ip,syslog_events_today,pa_types,agent,status
+          {% for x in rows %}
+          {{ x.device }},{{ x.ip }},{{ x.syslog_events_today }},{{ x.pa_types }},{{ x.agent }},{{ x.status }}
+          {% endfor %}
+      register: csvf
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "{{ rows | map(attribute='device') | zip(rows | map(attribute='status'), rows | map(attribute='syslog_events_today'), rows | map(attribute='pa_types'), rows | map(attribute='agent')) | map('join', ' | ') | list }}"
+          - "NO LOGS: {{ rows | selectattr('status','equalto','NO LOGS') | map(attribute='device') | list }}"
+          - "Syslog sources NOT in inventory (top 15 by volume): {{ unmatched }}"
+          - "CSV: {{ csvf.dest }}"

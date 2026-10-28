@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily read-only AD report
+Wants=network-online.target
+After=network-online.target
+[Service]
+Type=oneshot
+User=infraops
+Environment=PATH=/home/infraops/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 /home/infraops/infra/tools/ad_report.py

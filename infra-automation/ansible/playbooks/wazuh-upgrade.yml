@@ -1,0 +1,155 @@
+# wazuh-upgrade.yml - Wazuh servers 4.14.8 -> 4.14.9 (indexer, manager master, manager worker, dashboard).
+# Agents are NOT touched here (they must never be newer than the manager; upgrade them afterwards).
+#   ansible-playbook playbooks/wazuh-upgrade.yml --check-only     # (use: -e precheck_only=true)
+#   ansible-playbook playbooks/wazuh-upgrade.yml                  # real run, in a maintenance window
+# Guards: refuses to run before the release is 14 days old (2026-10-28) unless -e force_age=true;
+#         refuses unless the latest PBS backups of both Wazuh VMs are < 26 h old (checked on the PBS).
+# Rollback: restore wazuh-01 / wazuh-02 from PBS (namespace hv-a1). Indexer downgrades are not supported.
+- name: Pre-checks
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  vars:
+    release_ok_from: "2026-10-28"
+  tasks:
+    - name: Release age guard (policy - at least two weeks old)
+      ansible.builtin.assert:
+        that: lookup('pipe', 'date +%F') >= release_ok_from or (force_age | default(false) | bool)
+        fail_msg: "4.14.9 is eligible from {{ release_ok_from }} (14-day rule). Use -e force_age=true only with a documented reason."
+
+- name: Recent PBS backup of both Wazuh VMs must exist
+  hosts: pbs
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Newest snapshot age (hours) for VMs 501 and 502 in namespace hv-a1
+      ansible.builtin.shell: |
+        for id in 501 502; do
+          last=$(ls -1 /backup/datastore/ns/hv-a1/vm/$id 2>/dev/null | grep -E '^[0-9]{4}-' | sort | tail -1)
+          [ -z "$last" ] && { echo "$id NONE"; continue; }
+          age=$(( ( $(date -u +%s) - $(date -u -d "${last%Z}" +%s) ) / 3600 ))
+          echo "$id $age"
+        done
+      register: bk
+      changed_when: false
+    - ansible.builtin.assert:
+        that: bk.stdout_lines | map('split') | selectattr(1, 'equalto', 'NONE') | list | length == 0 and
+              (bk.stdout_lines | map('split') | map(attribute=1) | map('int') | max) < 26
+        fail_msg: "No fresh PBS backup of wazuh-01/02: {{ bk.stdout_lines }} - wait for the night run or back up first."
+    - ansible.builtin.debug: { msg: "backup ages (h): {{ bk.stdout_lines }}" }
+
+- name: Config backup + health before
+  hosts: wazuh-01,wazuh-02
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Archive configs (ossec, rules, integrations, certs, indexer/dashboard/filebeat configs)
+      ansible.builtin.shell: |
+        TS=$(date +%F-%H%M); F=/root/wazuh-preupgrade-$TS.tgz
+        tar czf $F /var/ossec/etc /var/ossec/integrations /var/ossec/active-response/bin \
+          /etc/wazuh-indexer /etc/wazuh-dashboard /etc/filebeat 2>/dev/null; chmod 600 $F; echo $F
+      register: arch
+    - ansible.builtin.debug: { msg: "{{ inventory_hostname }} config archive: {{ arch.stdout_lines | last }}" }
+    - name: Versions now
+      ansible.builtin.shell: dpkg-query -W -f='${Package} ${Version}\n' 'wazuh-*' filebeat 2>/dev/null
+      register: v
+      changed_when: false
+    - ansible.builtin.debug: { var: v.stdout_lines }
+    - ansible.builtin.meta: end_play
+      when: precheck_only | default(false) | bool
+
+- name: 1. Indexer (wazuh-01)
+  hosts: wazuh-01
+  become: true
+  gather_facts: false
+  serial: 1
+  vars:
+    curl: "curl -s --cacert /etc/wazuh-indexer/certs/root-ca.pem --cert /etc/wazuh-indexer/certs/admin.pem --key /etc/wazuh-indexer/certs/admin-key.pem"
+  tasks:
+    - name: Limit shard allocation + flush
+      ansible.builtin.shell: |
+        {{ curl }} -X PUT https://127.0.0.1:9200/_cluster/settings -H 'Content-Type: application/json' -d '{"persistent":{"cluster.routing.allocation.enable":"primaries"}}'
+        {{ curl }} -X POST https://127.0.0.1:9200/_flush
+    - name: Upgrade indexer (held package)
+      ansible.builtin.shell: |
+        set -e
+        apt-mark unhold wazuh-indexer >/dev/null 2>&1 || true
+        systemctl stop wazuh-indexer
+        apt-get update -qq
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::=--force-confold wazuh-indexer=4.14.9-1
+        apt-mark hold wazuh-indexer
+        systemctl daemon-reload; systemctl start wazuh-indexer
+    - name: Wait for indexer, re-enable allocation, health
+      ansible.builtin.shell: |
+        for i in $(seq 1 60); do {{ curl }} https://127.0.0.1:9200 >/dev/null && break; sleep 5; done
+        {{ curl }} -X PUT https://127.0.0.1:9200/_cluster/settings -H 'Content-Type: application/json' -d '{"persistent":{"cluster.routing.allocation.enable":"all"}}' >/dev/null
+        for i in $(seq 1 60); do s=$({{ curl }} https://127.0.0.1:9200/_cluster/health | python3 -c 'import json,sys;print(json.load(sys.stdin)["status"])'); [ "$s" != red ] && break; sleep 10; done
+        echo "health: $s"; {{ curl }} https://127.0.0.1:9200 | grep -E '"number"'
+      register: ih
+      failed_when: "'health: red' in ih.stdout or 'health: ' not in ih.stdout"
+    - ansible.builtin.debug: { var: ih.stdout_lines }
+
+- name: 2. Manager - master first, then worker (+ filebeat template/module for 4.14.9)
+  hosts: wazuh-01,wazuh-02
+  become: true
+  gather_facts: false
+  serial: 1
+  tasks:
+    - name: Upgrade manager
+      ansible.builtin.shell: |
+        set -e
+        apt-mark unhold wazuh-manager >/dev/null 2>&1 || true
+        apt-get update -qq
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::=--force-confold wazuh-manager=4.14.9-1
+        apt-mark hold wazuh-manager
+        systemctl daemon-reload; systemctl restart wazuh-manager
+    - name: Filebeat alerts template for 4.14.9 (pinned tag)
+      ansible.builtin.shell: |
+        set -e
+        curl -fsSL https://raw.githubusercontent.com/wazuh/wazuh/v4.14.9/extensions/elasticsearch/7.x/wazuh-template.json -o /tmp/wazuh-template.json
+        python3 -c 'import json;json.load(open("/tmp/wazuh-template.json"))'
+        install -m 0644 /tmp/wazuh-template.json /etc/filebeat/wazuh-template.json
+        systemctl restart filebeat
+        filebeat test output 2>&1 | tail -3
+      register: fb
+    - ansible.builtin.debug: { var: fb.stdout_lines }
+    - name: Manager health
+      ansible.builtin.shell: |
+        sleep 20
+        /var/ossec/bin/wazuh-control info | grep -E 'WAZUH_VERSION'
+        /var/ossec/bin/wazuh-control status | grep -vE 'is running' || echo "all daemons running"
+        /var/ossec/bin/cluster_control -l 2>/dev/null | head -5
+      register: mh
+      failed_when: "'all daemons running' not in mh.stdout"
+    - ansible.builtin.debug: { var: mh.stdout_lines }
+
+- name: 3. Dashboard (wazuh-01)
+  hosts: wazuh-01
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Upgrade dashboard
+      ansible.builtin.shell: |
+        set -e
+        apt-mark unhold wazuh-dashboard >/dev/null 2>&1 || true
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::=--force-confold wazuh-dashboard=4.14.9-1
+        apt-mark hold wazuh-dashboard
+        systemctl daemon-reload; systemctl restart wazuh-dashboard
+        for i in $(seq 1 30); do curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1:443/app/login | grep -q 200 && break; sleep 5; done
+        echo "dashboard: $(curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1:443/app/login)"
+      register: dh
+      failed_when: "'dashboard: 200' not in dh.stdout"
+
+- name: 4. Final check
+  hosts: wazuh-01
+  become: true
+  gather_facts: false
+  tasks:
+    - ansible.builtin.shell: |
+        sleep 60
+        echo "versions:"; dpkg-query -W -f='  ${Package} ${Version}\n' 'wazuh-*'
+        echo "agents active: $(/var/ossec/bin/agent_control -l | grep -c Active)"
+        /var/ossec/bin/cluster_control -l
+      register: fin
+      changed_when: false
+    - ansible.builtin.debug: { var: fin.stdout_lines }

@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily backup coverage report
+Wants=network-online.target
+After=network-online.target
+[Service]
+Type=oneshot
+User=infraops
+Environment=PATH=/home/infraops/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/infraops/infra/tools/backup-coverage-auto.sh

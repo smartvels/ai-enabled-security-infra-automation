@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# change - confirmation gate for changes run directly on the control server (until portal approvals are live).
+#   change playbooks/<name>.yml [ansible-playbook options...]
+set -uo pipefail
+export PATH="$HOME/.local/bin:$PATH"; cd "$HOME/infra/ansible" || exit 1
+PB="${1:?usage: change playbooks/<name>.yml [options]}"; shift
+read -rp "Reason for this change: " WHY; [ ${#WHY} -ge 5 ] || { echo "a reason is required"; exit 1; }
+read -rp "Change/ticket ID (optional): " CID
+echo "== PREVIEW (check mode: nothing is changed)"; ansible-playbook "$PB" "$@" --check --diff 2>&1 | grep -vE '^\s*$' | tail -60
+read -rp "Apply this change? Type YES: " OK; [ "$OK" = "YES" ] || { echo "cancelled"; logger -t change "CANCELLED $PB by $USER: $WHY"; exit 1; }
+SRC=$(echo "${SSH_CLIENT:-local}" | awk '{print $1}'); KEY=$(journalctl -u ssh --since -12h -o cat 2>/dev/null | grep "Accepted publickey for $USER from $SRC" | tail -1 | grep -oE 'SHA256:[^ ]+')
+ansible-playbook "$PB" "$@"; RC=$?
+M=$(date +%Y-%m); F="$HOME/infra/docs/changes/manual/$M.csv"; mkdir -p "$(dirname "$F")"
+[ -f "$F" ] || echo "type,date,user,source,key,playbook,options,reason,change_id,result,git" > "$F"
+printf 'manual-change,%s,%s,%s,%s,%s,"%s","%s",%s,%s,%s\n' "$(date -Is)" "$USER" "$SRC" "${KEY:-?}" "$PB" "$*" "${WHY//\"/\'}" "${CID:-}" "$([ $RC -eq 0 ] && echo ok || echo failed-rc$RC)" "$(git -C "$HOME/infra" rev-parse --short HEAD)" >> "$F"
+logger -t change "$([ $RC -eq 0 ] && echo APPLIED || echo FAILED) $PB by $USER from $SRC: $WHY"
+cd "$HOME/infra" && git add docs/changes && git commit -qm "change: $PB ($WHY)" && echo "== recorded in $F"
+exit $RC

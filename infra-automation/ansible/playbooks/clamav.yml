@@ -1,0 +1,79 @@
+# clamav.yml - ClamAV on Linux hosts: signature updates + daily scan (systemd timer), results to journald
+# (tag "clamscan") so Wazuh alerts on detections. Low-memory mode by default (no clamd daemon).
+#   ansible-playbook playbooks/clamav.yml -e target=ctl-01 -K
+#   ansible-playbook playbooks/clamav.yml -e target=linux_vms
+# Scan paths (override per host with clamav_paths): home dirs, temp dirs, /etc, /usr/local, /opt, /srv, /root
+# Never scans VM disks, PBS chunks or /proc,/sys,/dev (huge, pointless, and slow).
+- name: ClamAV
+  hosts: "{{ target }}"
+  become: true
+  gather_facts: false
+  vars:
+    clamav_paths: [/home, /root, /tmp, /var/tmp, /etc, /usr/local, /opt, /srv]
+    clamav_time: "03:15"
+  tasks:
+    - name: Install (scanner + signature updater only)
+      ansible.builtin.apt:
+        name: [clamav, clamav-freshclam]
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Signature updates running
+      ansible.builtin.systemd: { name: clamav-freshclam, state: started, enabled: true }
+
+    - name: Scan script (quiet unless something is found; results to journald tag clamscan)
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/clamscan-daily.sh
+        mode: "0750"
+        content: |
+          #!/bin/bash
+          out=$(clamscan -r -i --no-summary --cross-fs=no \
+                --exclude-dir='^/(proc|sys|dev|run)' --exclude-dir='/var/lib/vz|/backup/datastore|\.chunks' \
+                {{ clamav_paths | join(" ") }} 2>/dev/null); rc=$?
+          if [ $rc -eq 1 ]; then echo "$out" | while read -r l; do logger -t clamscan -p user.alert "INFECTED: $l"; done
+          elif [ $rc -eq 0 ]; then logger -t clamscan "scan clean: {{ clamav_paths | join(" ") }}"
+          else logger -t clamscan -p user.err "scan error rc=$rc"; fi
+          exit 0
+
+    - name: Scan service (lowest CPU/IO priority)
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/clamscan-daily.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=ClamAV daily scan (ctl-01 managed)
+          After=clamav-freshclam.service
+          [Service]
+          Type=oneshot
+          Nice=19
+          IOSchedulingClass=idle
+          ExecStart=/usr/local/sbin/clamscan-daily.sh
+
+    - name: Daily timer
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/clamscan-daily.timer
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=ClamAV daily scan
+          [Timer]
+          OnCalendar=*-*-* {{ clamav_time }}:00
+          RandomizedDelaySec=20min
+          Persistent=true
+          [Install]
+          WantedBy=timers.target
+
+    - name: Enable timer
+      ansible.builtin.systemd: { name: clamscan-daily.timer, state: started, enabled: true, daemon_reload: true }
+
+    - name: Status
+      ansible.builtin.shell: |
+        sleep 20
+        echo "freshclam: $(systemctl is-active clamav-freshclam)"
+        echo "signatures: $(sigtool --info /var/lib/clamav/daily.c[lv]d 2>/dev/null | awk -F': ' '/Build time/{print $2; exit}')"
+        echo "next scan: $(systemctl list-timers clamscan-daily.timer --no-legend | awk '{print $1, $2, $3}')"
+        echo "EICAR self-test: $(printf 'X5O!P%%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*' > /tmp/eicar.txt; clamscan --no-summary /tmp/eicar.txt 2>/dev/null | awk -F': ' '{print $2}'; rm -f /tmp/eicar.txt)"
+      register: st
+      changed_when: false
+    - ansible.builtin.debug: { var: st.stdout_lines }

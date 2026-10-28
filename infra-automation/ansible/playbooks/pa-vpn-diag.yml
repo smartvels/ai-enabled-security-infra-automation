@@ -1,0 +1,35 @@
+# pa-vpn-diag.yml - READ-ONLY: site-to-site tunnel events (7 days) + current tunnel state, per Palo Alto
+- hosts: firewalls
+  gather_facts: false
+  connection: local
+  tasks:
+    - ansible.builtin.meta: end_host
+      when: pan_api_key is not defined
+    - ansible.builtin.shell: |
+        C="curl -sS -k --max-time 60 --pinnedpubkey {{ pan_pin }} -H X-PAN-KEY:$PANKEY"
+        Q="(subtype eq vpn) and (receive_time geq '$(date -d '-7 days' '+%Y/%m/%d %H:%M:%S')')"
+        J=$($C -G "https://{{ ansible_host }}/api/" --data-urlencode type=log --data-urlencode log-type=system --data-urlencode nlogs=500 --data-urlencode "query=$Q" | sed -n 's:.*<job>\([0-9]*\)</job>.*:\1:p')
+        sleep 10
+        $C "https://{{ ansible_host }}/api/?type=log&action=get&job-id=$J" > /tmp/vpnlog-{{ inventory_hostname }}.xml
+        python3 - /tmp/vpnlog-{{ inventory_hostname }}.xml <<'PY'
+        import sys, collections, xml.etree.ElementTree as ET
+        ev = [(e.findtext("time_generated"), e.findtext("eventid"), e.findtext("object") or "", (e.findtext("opaque") or "")[:90]) for e in ET.parse(sys.argv[1]).getroot().iter("entry")]
+        down = [x for x in ev if "down" in (x[1] + x[3]).lower() or "fail" in (x[1] + x[3]).lower()]
+        print("events: %d, down/fail: %d" % (len(ev), len(down)))
+        print("down/fail per day:", dict(collections.Counter(x[0][:10] for x in down)))
+        print("down/fail per hour of day:", dict(sorted(collections.Counter(x[0][11:13] for x in down).items())))
+        print("per tunnel/object:", dict(collections.Counter(x[2] for x in down).most_common(6)))
+        for x in sorted(down)[-8:]: print("  ", " | ".join(x))
+        PY
+        rm -f /tmp/vpnlog-{{ inventory_hostname }}.xml
+        echo "--- current IPsec tunnels:"
+        $C "https://{{ ansible_host }}/api/?type=op&cmd=<show><vpn><flow></flow></vpn></show>" | python3 -c '
+        import sys, xml.etree.ElementTree as ET
+        for e in ET.parse(sys.stdin).getroot().iter("entry"):
+            n = e.findtext("name")
+            if n: print("  ", n, "|", e.findtext("state"), "| peer", e.findtext("peerip"))'
+      environment: { PANKEY: "{{ pan_api_key }}" }
+      register: d
+      no_log: true
+      changed_when: false
+    - ansible.builtin.debug: { var: d.stdout_lines }
